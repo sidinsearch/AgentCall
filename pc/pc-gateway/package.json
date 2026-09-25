@@ -1,9 +1,9 @@
 {
   "name": "@sidinsearch/agentcall-pc-gateway",
-  "version": "0.1.0",
+  "version": "0.2.0-cli",
   "private": true,
   "license": "AGPL-3.0-only",
-  "description": "AgentCall USB-only PC gateway and local MCP server for cellular calling. No SIP/RTP/Asterisk/STUN/LAN/Wi-Fi/WSS.",
+  "description": "AgentCall PC gateway with USB and network (TCP/Tailscale) modes, CLI tool, and local MCP server for cellular calling.",
   "type": "module",
   "engines": {
     "node": ">=20"
@@ -12,13 +12,18 @@
     ".": "./src/gateway.js",
     "./adb-manager.js": "./src/adb-manager.js",
     "./device-client.js": "./src/device-client.js",
+    "./network-adb-manager.js": "./src/network-adb-manager.js",
+    "./network-device-client.js": "./src/network-device-client.js",
+    "./network-bootstrap-transport.js": "./src/network-bootstrap-transport.js",
     "./policy.js": "./src/policy.js",
     "./framing.js": "./src/framing.js",
-    "./mcp-server.js": "./src/mcp-server.js"
+    "./mcp-server.js": "./src/mcp-server.js",
+    "./cli.js": "./src/agentcall-cli.js"
   },
   "bin": {
     "agentcall-mcp": "./src/mcp-server.js",
-    "agentcall-gatewayd": "./src/gatewayd.js"
+    "agentcall-gatewayd": "./src/gatewayd.js",
+    "agentcall-cli": "./src/agentcall-cli.js"
   },
   "scripts": {
     "test": "node --test --test-reporter=spec test/*.test.js",

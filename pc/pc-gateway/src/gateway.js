@@ -4,6 +4,8 @@ import { dirname } from 'node:path';
 
 import { AdbManager } from './adb-manager.js';
 import { DeviceClient } from './device-client.js';
+import { NetworkAdbManager } from './network-adb-manager.js';
+import { NetworkDeviceClient } from './network-device-client.js';
 import { DIR_HOST_TO_DEVICE } from './framing.js';
 import { Policy, redactPhoneNumber } from './policy.js';
 import { syncFinalizedRecording } from './recording-artifact-sync.js';
@@ -38,18 +40,32 @@ function canonicalJson(value) {
 export class Gateway extends EventEmitter {
   constructor(options = {}) {
     super();
-    this.adb = options.adb ?? new AdbManager({
+    const isNetworkMode = options.mode === 'network';
+    const adbOptions = isNetworkMode ? {} : {
       adbPath: options.adbPath,
       adbHome: options.adbHome,
       serverSocket: options.adbServerSocket,
       expectedIdentity: options.expectedIdentity,
-    });
+    };
+    this.adb = isNetworkMode
+      ? new NetworkAdbManager({
+          phoneHost: options.phoneHost,
+          phonePort: options.phonePort,
+          expectedIdentity: options.expectedIdentity,
+        })
+      : new AdbManager(adbOptions);
     if (!options.device && (!Buffer.isBuffer(options.controllerSecret) || options.controllerSecret.length !== 32)) {
       throw new Error('controller secret must be exactly 32 bytes');
     }
-    this.device = options.device ?? new DeviceClient({
-      enrollmentSecret: Buffer.from(options.controllerSecret),
-    });
+    this.device = options.device ?? isNetworkMode
+      ? new NetworkDeviceClient({
+          host: options.phoneHost,
+          port: options.phonePort,
+          enrollmentSecret: Buffer.from(options.controllerSecret),
+        })
+      : new DeviceClient({
+          enrollmentSecret: Buffer.from(options.controllerSecret),
+        });
     this.hostPort = options.hostPort;
     this.phonePort = options.phonePort;
     this.idempotencySalt = options.idempotencySalt ?? 'agentcall-local';
@@ -603,11 +619,15 @@ export class Gateway extends EventEmitter {
 
   async start({ phoneHost = '127.0.0.1', phonePort, serial, simulator = false, existingForward = null } = {}) {
     if (this.state !== 'stopped') throw new Error(`gateway already ${this.state}`);
-    if (!LOOPBACK_HOSTS.has(phoneHost)) throw new Error('refused non-loopback phone host');
+    const isNetworkMode = this.adb instanceof NetworkAdbManager;
+    if (!isNetworkMode && !LOOPBACK_HOSTS.has(phoneHost)) throw new Error('refused non-loopback phone host');
     this.state = 'connecting';
     try {
       if (!simulator) {
-        if (existingForward) {
+        if (isNetworkMode) {
+          // Network mode: no ADB forwarding needed. Device connects directly.
+          this.forward = { serial: 'NETWORK', hostPort: phonePort, phonePort };
+        } else if (existingForward) {
           this.forward = existingForward;
         } else {
           const selected = serial
@@ -620,8 +640,8 @@ export class Gateway extends EventEmitter {
       if (this.recording?.health) this.recordingHealth = await this.recording.health();
       if (this.device.state !== 'connected') {
         await this.device.connect({
-          host: '127.0.0.1',
-          port: simulator ? phonePort : this.hostPort,
+          host: isNetworkMode ? phoneHost : '127.0.0.1',
+          port: simulator ? phonePort : isNetworkMode ? phonePort : this.hostPort,
         });
       }
       await this.device.sendControl({
@@ -650,6 +670,7 @@ export class Gateway extends EventEmitter {
   }
 
   status() {
+    const isNetworkMode = this.adb instanceof NetworkAdbManager;
     const authenticated = this.device?.state === 'connected';
     const simulator = this.runtimeIdentity.simulator === true;
     const connected = this.state === 'running' && authenticated && (simulator || this.forward !== null);
@@ -662,7 +683,7 @@ export class Gateway extends EventEmitter {
       device: {
         connected,
         authenticated,
-        transport: simulator ? 'simulator' : 'usb',
+        transport: simulator ? 'simulator' : isNetworkMode ? 'network' : 'usb',
         phase,
       },
       recording: { ...this.recordingHealth, active: this.activeRecorder !== null },

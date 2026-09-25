@@ -11,6 +11,9 @@ import { BootstrapClient } from './bootstrap-client.js';
 import { BootstrapTransport } from './bootstrap-transport.js';
 import { ControllerCredentialStore } from './controller-credential-store.js';
 import { DeviceClient } from './device-client.js';
+import { NetworkAdbManager } from './network-adb-manager.js';
+import { NetworkBootstrapTransport } from './network-bootstrap-transport.js';
+import { NetworkDeviceClient } from './network-device-client.js';
 import { Gateway } from './gateway.js';
 import { CallerMemoryStore } from './caller-memory.js';
 import { loadControllerSecret as readControllerSecret } from './controller-secret.js';
@@ -310,6 +313,9 @@ export async function runGatewayd({
   createBootstrapTransport = (options) => new BootstrapTransport(options),
   createBootstrapClient = (options) => new BootstrapClient(options),
   createDeviceClient = (options) => new DeviceClient(options),
+  createNetworkBootstrapTransport = (options) => new NetworkBootstrapTransport(options),
+  createNetworkDeviceClient = (options) => new NetworkDeviceClient(options),
+  createNetworkAdbManager = (options) => new NetworkAdbManager(options),
   phoneRetryMs = 5_000,
   setRetryTimer = setTimeout,
   clearRetryTimer = clearTimeout,
@@ -519,6 +525,137 @@ export async function runGatewayd({
       signals.once?.('SIGTERM', stop);
       signals.once?.('SIGINT', stop);
       await connectPhone();
+      return { gateway: control, rpc, simulator: null, stop };
+    }
+
+    // Network mode: connect directly to phone over TCP, no ADB required.
+    if (config.mode === 'network') {
+      const store = createControllerCredentialStore({ path: config.controllerSecretFile });
+      control = new LocalControlPlane({
+        recording, providerSettings, agentAnswering, phoneData,
+        checkProviderHealth, testProviders, prewarmSpeech,
+      });
+      rpc = createRpcServer(control, { socketPath: rpcSocketPath });
+      await rpc.start();
+
+      const cleanupNetwork = async () => {
+        const ownedGateway = gateway;
+        const ownedDevice = device;
+        gateway = null;
+        device = null;
+        try { await ownedGateway?.stop(); } catch {}
+        try { await ownedDevice?.disconnect(); } catch {}
+      };
+      const scheduleRetry = () => {
+        if (stopping || retryTimer) return;
+        retryTimer = setRetryTimer(() => {
+          retryTimer = null;
+          void connectNetworkPhone();
+        }, phoneRetryMs);
+        retryTimer?.unref?.();
+      };
+      const connectNetworkPhone = async () => {
+        if (stopping || control.delegate) return;
+        try {
+          const recovery = await store.recover();
+          controllerSecret = await store.load();
+          control.setStage('VERIFYING_DEVICE');
+          const g2Authenticate = async (key) => {
+            control.setStage('AUTHENTICATING');
+            device = createNetworkDeviceClient({ host: config.phoneHost, port: config.phonePort, enrollmentSecret: Buffer.from(key) });
+            await device.connect();
+          };
+          if (recovery.state === 'committed') {
+            if (!controllerSecret) throw new Error('committed controller credential is missing');
+            await g2Authenticate(controllerSecret);
+          } else if (recovery.state === 'staged') {
+            const transport = createNetworkBootstrapTransport({ host: config.phoneHost, port: config.phonePort });
+            const client = createBootstrapClient({ store, transport, g2Authenticate });
+            await client.recover(recovery);
+            controllerSecret = await store.load();
+          } else if (recovery.state === 'absent') {
+            control.setStage('WAITING_FOR_PHONE_START', 'phone_start_required');
+            const transport = createNetworkBootstrapTransport({ host: config.phoneHost, port: config.phonePort });
+            const client = createBootstrapClient({ store, transport, g2Authenticate });
+            const identity = {
+              serial: 'NETWORK-PHONE',
+              product: 'lineage_miatoll',
+              device: 'gram',
+              api: 35,
+              systemFingerprint: 'network/system/device:15/AP3A/public:user/release-keys',
+              vendorFingerprint: 'network/vendor/device:15/AP3A/public:user/release-keys',
+              packageName: 'com.callagent.gateway',
+              versionCode: 333,
+              signingCertSha256: '0'.repeat(64),
+              artifactManifestSha256: '0'.repeat(64),
+              desktopBootstrapVersion: 1,
+            };
+            await client.pair({ identity });
+            controllerSecret = await store.load();
+          } else {
+            throw new Error('controller credential state is invalid');
+          }
+          if (!controllerSecret) throw new Error('controller credential commit is missing');
+          gateway = createGateway({
+            ...config.gateway,
+            mode: 'network',
+            idempotencySalt: redactionSalt,
+            controllerSecret: Buffer.from(controllerSecret),
+            phoneHost: config.phoneHost,
+            phonePort: config.phonePort,
+            recording,
+            phoneData,
+            providerSettings,
+            agentAnswering,
+            ...(callerMemory ? { callerMemory } : {}),
+            ...(createRealtimeSession
+              ? { createRealtimeSession, checkProviderHealth, testProviders, prewarmSpeech }
+              : {}),
+          });
+          await gateway.start({ phoneHost: config.phoneHost, phonePort: config.phonePort });
+          control.attach(gateway);
+          control.setStage('AUTHENTICATED');
+          device = gateway.device ?? device;
+          device?.on?.('state', (state) => {
+            if (state !== 'connected' && !stopping) {
+              control.detach();
+              control.setStage('WAITING_FOR_PHONE', 'phone_not_connected');
+              void cleanupNetwork().then(scheduleRetry);
+            }
+          });
+        } catch (error) {
+          const message = `${error?.message ?? ''}`.toLowerCase();
+          let failureStage = 'WAITING_FOR_PHONE';
+          let failureReason = 'phone_not_connected';
+          if (/econnrefused|timed out|timeout|closed|reset/.test(message)) {
+            failureReason = 'phone_unreachable';
+          } else if (message.includes('authentication failed')) {
+            failureStage = 'PAIRING';
+            failureReason = 'secure_pairing_failed';
+          }
+          control.detach();
+          await cleanupNetwork();
+          control.setStage(failureStage, failureReason);
+          scheduleRetry();
+        } finally {
+          controllerSecret?.fill(0);
+          controllerSecret = null;
+        }
+      };
+      const stop = () => {
+        stopping = true;
+        if (retryTimer) clearRetryTimer(retryTimer);
+        retryTimer = null;
+        stopPromise ??= (async () => {
+          control.detach();
+          await rpc.stop();
+          await cleanupNetwork();
+        })();
+        return stopPromise;
+      };
+      signals.once?.('SIGTERM', stop);
+      signals.once?.('SIGINT', stop);
+      await connectNetworkPhone();
       return { gateway: control, rpc, simulator: null, stop };
     }
 

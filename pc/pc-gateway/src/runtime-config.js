@@ -125,8 +125,8 @@ function dialPolicy(env) {
 
 export function configFromEnv(env = process.env) {
   const mode = env.AGENTCALL_MODE ?? 'hardware';
-  if (mode !== 'hardware' && mode !== 'simulator') {
-    throw new Error('AGENTCALL_MODE must be hardware or simulator');
+  if (mode !== 'hardware' && mode !== 'simulator' && mode !== 'network') {
+    throw new Error('AGENTCALL_MODE must be hardware, simulator, or network');
   }
   const hostPort = port(env, 'AGENTCALL_HOST_PORT', 5040);
   const phonePort = port(env, 'AGENTCALL_PHONE_PORT', 27183);
@@ -146,6 +146,36 @@ export function configFromEnv(env = process.env) {
         policy: dialPolicy(env),
       },
       start: { simulator: true, phoneHost: '127.0.0.1' },
+    };
+  }
+
+  if (mode === 'network') {
+    // Network mode: connect to phone over TCP, no ADB.
+    const phoneHost = env.AGENTCALL_PHONE_HOST;
+    if (!phoneHost || !/^([a-zA-Z0-9]([a-zA-Z0-9\-\.]*[a-zA-Z0-9])?|\d{1,3}(\.\d{1,3}){3})$/.test(phoneHost)) {
+      throw new Error('AGENTCALL_PHONE_HOST is required for network mode and must be a valid hostname or IP');
+    }
+    const controllerSecretFile = env.AGENTCALL_CONTROLLER_SECRET_FILE || '/var/lib/agentcall/controller/controller.key';
+    const redactionSaltFile = env.AGENTCALL_REDACTION_SALT_FILE || '/var/lib/agentcall/redaction-salt';
+    if (controllerSecretFile.length > 300 || !isAbsolute(controllerSecretFile)) {
+      throw new Error('AGENTCALL_CONTROLLER_SECRET_FILE must be an absolute path up to 300 characters');
+    }
+    if (redactionSaltFile.length > 300 || !isAbsolute(redactionSaltFile)) {
+      throw new Error('AGENTCALL_REDACTION_SALT_FILE must be an absolute path up to 300 characters');
+    }
+    return {
+      ...common,
+      phoneHost,
+      phonePort,
+      controllerSecretFile,
+      redactionSaltFile,
+      gateway: {
+        hostPort,
+        phonePort,
+        idempotencySalt: env.AGENTCALL_REDACTION_SALT || 'agentcall-local',
+        policy: dialPolicy(env),
+      },
+      start: { phoneHost, phonePort },
     };
   }
 
