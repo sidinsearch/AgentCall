@@ -40,4 +40,23 @@
     <string name="dialer_status_phone_available_gateway_not_ready">Phone available · gateway not ready</string>
     <string name="project">Project</string>
     <string name="agentcall_on_github">AgentCall on GitHub</string>
+    <string name="network_mode_title">Network Gateway</string>
+    <string name="network_mode_subtitle">Listen for desktop (or Tailscale) connections from the agent machine — LAN or internet, no USB required</string>
+    <string name="network_connection_stopped">Network gateway stopped</string>
+    <string name="network_listen_start">Start listening</string>
+    <string name="network_listening">Listening…</string>
+    <string name="network_connection_ready">Connection ready</string>
+    <string name="network_connection_ready_detail">The phone is listening. Connect the desktop to this phone over the network using the address below.</string>
+    <string name="host_ip_or_hostname">Phone IP or hostname</string>
+    <string name="port_number">Port</string>
+    <string name="network_test_bind">Test bind</string>
+    <string name="network_stop_bind">Stop listener</string>
+    <string name="network_bind_ok">Bind successful on port %1$d</string>
+    <string name="network_bind_failed">Could not bind — port may be in use</string>
+    <string name="network_mode_how_it_works">How it works\\nNo USB cable or Android Debug Bridge is needed. The phone starts a network listener, and the desktop reaches it by host and port on the same network or over Tailscale. Pairing, call-log sync, contact sync, and real-time audio continue the same way. Calls stay blocked until the desktop confirms recording health.</string>
+    <string name="network_connection_panel_title">Connection address</string>
+    <string name="network_default_host_hint">192.168.1.50</string>
+    <string name="network_default_port_hint">27183</string>
+    <string name="network_listener_bound">Listening on port %1$d</string>
+    <string name="network_listener_stopped">Listener stopped</string>
 </resources>

@@ -8,7 +8,7 @@ const MAX_SHORT = 64;
 const MAX_SECRET = 4096;
 const RESOURCES = new Set([
   'overview', 'mcp', 'android', 'stt', 'tts', 'liveCall', 'callHistory', 'storage',
-  'contacts', 'callLog', 'agentAnswering',
+  'contacts', 'callLog', 'agentAnswering', 'networkConfig',
 ]);
 const CALL_ACTIONS = new Set(['dial', 'answer', 'reject', 'hangup', 'dtmf']);
 const PROVIDER_MODELS = Object.freeze({
@@ -39,6 +39,7 @@ export const IPC_CHANNELS = Object.freeze({
   'action:recording': Object.freeze(['action', 'callId']),
   'config:agent-answering': Object.freeze(['enabled', 'instructions']),
   'config:secret': Object.freeze(['kind', 'provider', 'model', 'language', 'voice', 'apiKey', 'zeroRetention']),
+  'config:network': Object.freeze(['enabled', 'host', 'port']),
   'data:read': Object.freeze(['resource', 'id']),
   'policy:authorize-download': Object.freeze(['callId']),
 });
@@ -176,10 +177,20 @@ export function validateIpcRequest(channel, payload) {
       2_000,
       { allowEmpty: true },
     );
-    if (/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/u.test(instructions)) {
+    if ( /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/u.test(instructions)) {
       throw new TypeError('agent answering instructions contain invalid controls');
     }
     return { enabled: payload.enabled, instructions };
+  }
+
+  if (channel === 'config:network') {
+    exactKeys(payload, ['enabled'], ['host', 'port']);
+    if (typeof payload.enabled !== 'boolean') throw new TypeError('enabled must be a boolean');
+    return {
+      enabled: payload.enabled,
+      host: typeof payload.host === 'string' && payload.host.length > 0 ? boundedString(payload.host, 'host', 128) : '',
+      port: Number.isInteger(payload.port) && payload.port >= 1024 && payload.port <= 65535 ? payload.port : 27183,
+    };
   }
 
   exactKeys(payload, ['kind', 'provider', 'model', 'language', 'apiKey'], ['voice', 'zeroRetention']);
@@ -235,6 +246,19 @@ async function readResource(request, gateway, agentIntegration = null) {
     }
     if (request.resource === 'agentAnswering') {
       return redactObject({ mode: 'live', ...await gateway.agentAnsweringStatus() });
+    }
+    if (request.resource === 'networkConfig') {
+      const status = await gateway.status();
+      const transport = status?.device?.transport;
+      const phoneHost = status?.device?.phoneHost;
+      const phonePort = status?.device?.phonePort;
+      return redactObject({
+        mode: 'live',
+        enabled: transport === 'network' || (typeof process !== 'undefined' && process.env?.AGENTCALL_MODE === 'network'),
+        host: phoneHost ?? '',
+        port: phonePort ?? 27183,
+        transport: transport ?? 'hardware',
+      });
     }
     const status = await gateway.status();
     if (request.resource === 'overview') return redactObject({ mode: 'live', gateway: status });
@@ -430,6 +454,15 @@ export function createIpcHandlers({
       };
       onProviderConfigured(receipt);
       audit({ channel: 'config:secret', kind: request.kind, provider: request.provider, configured: receipt.configured });
+      return receipt;
+    },
+    'config:network': async (_event, payload) => {
+      const request = validateIpcRequest('config:network', payload);
+      const enabled = request.enabled === true;
+      const host = enabled ? boundedString(request.host ?? '', 'phone host', 128) : '';
+      const port = enabled ? (Number.isInteger(request.port) && request.port >= 1024 && request.port <= 65535 ? request.port : 27183) : 27183;
+      const receipt = { accepted: true, enabled, host, port };
+      audit({ channel: 'config:network', enabled, host, port });
       return receipt;
     },
     'policy:authorize-download': async (_event, payload) => {

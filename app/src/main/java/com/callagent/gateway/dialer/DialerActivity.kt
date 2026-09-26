@@ -26,6 +26,7 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.callagent.gateway.R
 import com.callagent.gateway.gsm.GsmCallManager
+import com.callagent.gateway.network.NetworkGatewayActivity
 import com.callagent.gateway.usb.GatewayStateStore
 import com.callagent.gateway.usb.GatewayUiState
 import com.callagent.gateway.usb.UsbGatewayActivity
@@ -94,7 +95,7 @@ class DialerActivity : AppCompatActivity() {
         dialNumber = findViewById(R.id.etDialNumber)
         dialNumber.showSoftInputOnFocus = false
         findViewById<Button>(R.id.btnOpenGateway).setOnClickListener {
-            startActivity(Intent(this, UsbGatewayActivity::class.java))
+            showGatewayModeDialog()
         }
         tabs = listOf(R.id.tabRecents, R.id.tabContacts, R.id.tabKeypad, R.id.tabRecordings)
             .associateWith { findViewById(it) }
@@ -523,6 +524,22 @@ class DialerActivity : AppCompatActivity() {
         ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED
 
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).roundToInt()
+
+    private fun showGatewayModeDialog() {
+      AlertDialog.Builder(this)
+        .setTitle("Open gateway")
+        .setMessage("Choose how the desktop will connect to this phone.")
+        .setPositiveButton("USB · Cable") { _, _ ->
+          startActivity(Intent(this, UsbGatewayActivity::class.java))
+        }
+        .setNegativeButton("Network · Wi‑Fi / Internet") { _, _ ->
+          startActivity(Intent(this, NetworkGatewayActivity::class.java))
+        }
+        .setOnCancelListener {
+          // User cancelled the dialog; nothing to clean up.
+        }
+        .show()
+    }
 
     private companion object {
         const val REQUEST_PERMISSIONS = 27184

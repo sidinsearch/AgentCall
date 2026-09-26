@@ -13,6 +13,7 @@ const IPC_CHANNELS = new Set([
   'action:recording',
   'config:agent-answering',
   'config:secret',
+  'config:network',
   'data:read',
   'policy:authorize-download',
 ]);
@@ -66,6 +67,7 @@ const api = Object.freeze({
   openProjectPage: () => invoke('action:project-link', {}),
   saveSecret: (config) => invoke('config:secret', config),
   saveAgentAnswering: (config) => invoke('config:agent-answering', config),
+  configureNetwork: (config) => invoke('config:network', config),
   onNavigate: (callback) => {
     if (typeof callback !== 'function') throw new TypeError('navigation callback must be a function');
     const listener = (_event, route) => { if (ROUTES.has(route)) callback(route); };

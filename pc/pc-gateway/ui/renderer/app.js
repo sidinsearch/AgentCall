@@ -491,8 +491,12 @@ async function renderAndroid() {
     panel.querySelector('.panel-state').textContent = `${label} · ${guidance}`;
     const status = setupCard('Live connection', 'Current phone and recording health from the local gateway service.');
     addStatusRow(status, 'Connection', label, tone);
-    addStatusRow(status, 'Transport', device.transport === 'simulator' ? 'SIMULATOR' : 'USB only', device.transport === 'simulator' ? 'info-text' : '');
+    addStatusRow(status, 'Transport', device.transport === 'simulator' ? 'SIMULATOR' : device.transport === 'network' ? 'Network TCP' : 'USB only', device.transport === 'simulator' ? 'info-text' : '');
     addStatusRow(status, 'Authentication', device.authenticated ? 'Complete' : 'Not established', device.authenticated ? 'healthy-text' : 'danger-text');
+    if (device.transport === 'network') {
+      addStatusRow(status, 'Phone host', device.phoneHost ?? 'Not configured', device.phoneHost ? 'healthy-text' : 'warning-text');
+      addStatusRow(status, 'Phone port', String(device.phonePort ?? ''), '');
+    }
     addStatusRow(status, 'Recording', gateway.recording?.healthy ? 'Healthy' : String(gateway.recording?.reason ?? 'Unavailable'), gateway.recording?.healthy ? 'healthy-text' : 'danger-text');
     const speechConfigured = stt?.mode === 'live' && tts?.mode === 'live'
       && stt.enabled === true && tts.enabled === true
@@ -1030,10 +1034,62 @@ async function renderSettings() {
   panel.append(grid);
   workspace.replaceChildren(panel);
 
-  const desktop = setupCard('Desktop service', 'The packaged app communicates with one local gateway service and does not expose a network control endpoint.', 'agentcall');
-  const sync = setupCard('Phone synchronization', 'Contacts and call history refresh automatically after the authenticated USB connection is ready.');
+  const network = setupCard('Network mode', 'Connect the gateway to a phone over Tailscale, LAN, or the internet instead of USB. The phone runs the network listener and the desktop reaches it by hostname or IP.');
+  const networkModeRow = document.createElement('div');
+  networkModeRow.className = 'network-mode-row';
+  const networkModeLabel = document.createElement('label');
+  networkModeLabel.className = 'toggle-switch';
+  networkModeLabel.setAttribute('aria-label', 'Enable network mode');
+  const networkMode = document.createElement('input');
+  networkMode.type = 'checkbox';
+  const networkModeSlider = document.createElement('span');
+  networkModeSlider.setAttribute('aria-hidden', 'true');
+  networkModeLabel.append(networkMode, networkModeSlider);
+  const networkModeCopy = document.createElement('div');
+  const networkModeTitle = document.createElement('strong');
+  networkModeTitle.textContent = 'Network transport';
+  const networkModeDescription = document.createElement('span');
+  networkModeDescription.textContent = 'When enabled, gatewayd connects to the phone over TCP. Disable to use USB/ADB instead.';
+  networkModeCopy.append(networkModeTitle, networkModeDescription);
+  networkModeRow.append(networkModeCopy, networkModeLabel);
+  const hostRow = document.createElement('div');
+  hostRow.className = 'field';
+  const hostLabel = document.createElement('label');
+  hostLabel.setAttribute('for', 'network-host');
+  hostLabel.textContent = 'Phone host';
+  const hostInput = document.createElement('input');
+  hostInput.type = 'text';
+  hostInput.id = 'network-host';
+  hostInput.placeholder = 'e.g. 100.85.23.15 or mypc.tailnet-ts.net';
+  const hostDescription = document.createElement('small');
+  hostDescription.textContent = 'Tailscale IP, LAN IP, or hostname reachable from this desktop.';
+  hostRow.append(hostLabel, hostInput, hostDescription);
+  const portRow = document.createElement('div');
+  portRow.className = 'field';
+  const portLabel = document.createElement('label');
+  portLabel.setAttribute('for', 'network-port');
+  portLabel.textContent = 'Phone port';
+  const portInput = document.createElement('input');
+  portInput.type = 'number';
+  portInput.id = 'network-port';
+  portInput.min = 1024;
+  portInput.max = 65535;
+  portInput.value = '27183';
+  const portDescription = document.createElement('small');
+  portDescription.textContent = 'The TCP port the phone network listener binds to.';
+  portRow.append(portLabel, portInput, portDescription);
+  const networkActions = document.createElement('div');
+  networkActions.className = 'network-actions';
+  const networkFeedback = document.createElement('p');
+  networkFeedback.className = 'form-feedback muted';
+  networkFeedback.setAttribute('role', 'status');
+  const networkSave = document.createElement('button');
+  networkSave.type = 'button';
+  networkSave.className = 'secondary';
+  networkSave.textContent = 'Save network settings';
+  networkActions.append(networkFeedback, networkSave);
+  network.append(networkModeRow, hostRow, portRow, networkActions);
   const storage = setupCard('Recordings & privacy', 'Finalized recordings are managed by the gateway service. Speech credentials remain write-only and are never rendered here.');
-  addStatusRow(storage, 'Recording catalog', 'Local');
   addStatusRow(storage, 'Credential display', 'Never');
   addStatusRow(storage, 'Release', '1.0.1');
   const project = setupCard(
@@ -1130,8 +1186,14 @@ async function renderSettings() {
     const live = overview?.mode === 'live';
     const device = live ? overview.gateway?.device ?? {} : {};
     addStatusRow(desktop, 'Gateway service', live ? 'Running' : 'Unavailable', live ? 'healthy-text' : 'warning-text');
-    addStatusRow(desktop, 'Phone', device.authenticated ? 'Authenticated USB' : 'Not connected', device.authenticated ? 'healthy-text' : 'warning-text');
-    addStatusRow(desktop, 'Control channel', 'Local IPC');
+    addStatusRow(desktop, 'Phone', device.authenticated ? (device.transport === 'network' ? 'Authenticated network' : 'Authenticated USB') : 'Not connected', device.authenticated ? 'healthy-text' : 'warning-text');
+    addStatusRow(desktop, 'Control channel', device.transport === 'network' ? 'Network TCP' : 'Local IPC');
+    const networkConfig = await window.gatewayDesktop.read('networkConfig') ?? {};
+    networkMode.checked = networkConfig.enabled === true;
+    hostInput.value = networkConfig.host ?? '';
+    portInput.value = String(networkConfig.port ?? 27183);
+    hostInput.disabled = !networkMode.checked;
+    portInput.disabled = !networkMode.checked;
     const contacts = contactsData?.sync ?? {};
     const calls = callLogData?.sync ?? {};
     addStatusRow(sync, 'Contacts', contacts.state === 'ready' ? `${contacts.count} ready` : String(contacts.state ?? 'Waiting'), contacts.state === 'ready' ? 'healthy-text' : 'warning-text');
@@ -1176,7 +1238,34 @@ async function renderSettings() {
       save.disabled = false;
     }
   });
-  grid.append(receptionist, desktop, sync, storage, project);
+  networkSave.addEventListener('click', async () => {
+    networkSave.disabled = true;
+    networkFeedback.textContent = 'Saving network settings…';
+    networkFeedback.className = 'form-feedback muted';
+    try {
+      const mode = networkMode.checked;
+      const host = hostInput.value.trim();
+      const port = parseInt(portInput.value, 10);
+      if (mode && (!host || !/^(?:[a-zA-Z0-9](?:[a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.?)+$/.test(host) && !/^\d{1,3}(\.\d{1,3}){3}$/.test(host))) {
+        throw new Error('Invalid host');
+      }
+      if (mode && (isNaN(port) || port < 1024 || port > 65535)) {
+        throw new Error('Invalid port');
+      }
+      const receipt = await window.gatewayDesktop.configureNetwork({ enabled: mode, host, port });
+      if (receipt?.accepted !== true) throw new Error('settings rejected');
+      networkFeedback.textContent = mode
+        ? `Enabled · connecting to ${host ?? 'phone'}:${port} over network`
+        : 'Disabled · will use USB/ADB transport';
+      networkFeedback.className = `form-feedback ${mode ? 'healthy-text' : 'muted'}`;
+    } catch {
+      networkFeedback.textContent = 'Could not save · check the local gateway service';
+      networkFeedback.className = 'form-feedback danger-text';
+    } finally {
+      networkSave.disabled = false;
+    }
+  });
+  grid.append(network, receptionist, desktop, sync, storage, project);
 }
 
 let phoneCalls = [];
