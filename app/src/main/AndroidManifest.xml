@@ -71,12 +71,22 @@
                 <data android:scheme="tel" />
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.CALL" />
+                <data android:scheme="tel" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
         </activity>
 
         <activity
             android:name=".usb.UsbGatewayActivity"
             android:exported="false"
             android:label="USB Gateway" />
+
+        <activity
+            android:name=".network.NetworkGatewayActivity"
+            android:exported="false"
+            android:label="Network Gateway" />
 
         <service
             android:name=".gsm.GsmCallService"
