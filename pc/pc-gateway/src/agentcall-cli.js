@@ -23,7 +23,11 @@ async function rpcCall(socketPath, method, args = {}) {
     const socket = netSocket.createConnection(socketPath);
     const timeout = setTimeout(() => { socket.destroy(); reject(new Error('rpc timeout')); }, 30_000);
     socket.on('connect', () => {
-      const request = JSON.stringify({ jsonrpc: '2024-11-05', method, params: args, id: createHash('sha256').update(randomBytes(16).toString('hex')).digest('hex').slice(0, 16) });
+      const request = JSON.stringify({
+        id: createHash('sha256').update(randomBytes(16).toString('hex')).digest('hex').slice(0, 16),
+        method,
+        args,
+      });
       socket.write(request + '\n');
     });
     socket.on('data', (chunk) => {
