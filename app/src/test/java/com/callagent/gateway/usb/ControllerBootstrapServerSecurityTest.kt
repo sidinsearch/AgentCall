@@ -9,7 +9,8 @@ class ControllerBootstrapServerSecurityTest {
     @Test
     fun `bootstrap uses fixed loopback-only ADB forward with bounded claim and no exported component`() {
         val source = File("src/main/java/com/callagent/gateway/usb/ControllerBootstrapServer.kt").readText()
-        assertTrue(source.contains("ServerSocket(BOOTSTRAP_PORT, 1, InetAddress.getByName(LOOPBACK_HOST))"))
+        assertTrue(source.contains("bindHost: String = LOOPBACK_HOST"))
+        assertTrue(source.contains("ServerSocket(BOOTSTRAP_PORT, 1, InetAddress.getByName(bindHost))"))
         assertTrue(source.contains("tryClaimForwardedTunnel()"))
         assertTrue(source.contains("BootstrapAuthorizationWindow"))
         assertTrue(source.contains("onExpired"))
