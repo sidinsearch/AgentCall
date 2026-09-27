@@ -252,7 +252,6 @@ export class NetworkDeviceClient extends EventEmitter {
         // Session established
         const sessionDigest = authProof(this._enrollmentSecret, AUTH_SESSION_DOMAIN, serverNonce, clientNonce);
         socket.write(sessionDigest);
-        socket.flush();
         this._enrollmentSecret.fill(0);
         serverNonce.fill(0);
         clientNonce.fill(0);
