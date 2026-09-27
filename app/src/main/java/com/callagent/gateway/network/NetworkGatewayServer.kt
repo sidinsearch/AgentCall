@@ -1,5 +1,6 @@
 package com.callagent.gateway.network
 
+import com.callagent.gateway.usb.*
 import java.io.IOException
 import java.io.InputStream
 import java.net.ServerSocket
@@ -577,8 +578,6 @@ class NetworkGatewayServer(
             "agentcall-controller-session-v1\u0000".toByteArray(StandardCharsets.US_ASCII)
     }
 }
-
-package com.callagent.gateway.network
 
 interface NetworkGatewayListener {
     fun onListenerStarted(port: Int) {}

@@ -104,8 +104,7 @@ class NetworkGatewayActivity : AppCompatActivity() {
 
   private fun render(state: GatewayUiState) {
     val connected = state.desktopConnected
-    val authenticated = state.connection == GatewayUiState.Connection.AUTHENTICATED_NETWORK ||
-        state.connection == GatewayUiState.Connection.AUTHENTICATED_USB
+    val authenticated = connected && state.connection == GatewayUiState.Connection.DESKTOP_CONNECTED
 
     badge.text = when {
       listening.get() -> getString(R.string.network_listening)
@@ -158,7 +157,7 @@ class NetworkGatewayActivity : AppCompatActivity() {
       testBind.visibility = View.GONE
       stopBind.visibility = View.VISIBLE
       portInput.isEnabled = false
-      portInput.setText(String.valueOf(serverSocket!!.localPort))
+      portInput.setText(serverSocket!!.localPort.toString())
     } else {
       testBind.visibility = View.VISIBLE
       stopBind.visibility = View.GONE
@@ -185,7 +184,7 @@ class NetworkGatewayActivity : AppCompatActivity() {
 
   private fun startListening() {
     if (!hasRequiredPermissions()) {
-      requestPermissions(REQUIRED_PERMISSIONS, 27183)
+      requestGatewayPermissions(REQUIRED_PERMISSIONS.toTypedArray(), 27183)
       return
     }
     val port = readPortPreference(27183) ?: 27183
@@ -261,7 +260,7 @@ class NetworkGatewayActivity : AppCompatActivity() {
     }
   }
 
-  private fun requestPermissions(perms: Array<String>, requestCode: Int) {
+  private fun requestGatewayPermissions(perms: Array<String>, requestCode: Int) {
     ActivityCompat.requestPermissions(this, perms, requestCode)
   }
 

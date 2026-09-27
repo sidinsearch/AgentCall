@@ -33,6 +33,7 @@ import com.callagent.gateway.dialer.PhoneRecordingArtifactReceiver
 import com.callagent.gateway.dialer.PhoneRecordingMediaStore
 import com.callagent.gateway.dialer.PhoneRecordingStore
 import com.callagent.gateway.gsm.GsmCallManager
+import com.callagent.gateway.usb.*
 import com.callagent.gateway.usb.UsbAudioBridgeCoordinator
 import com.callagent.gateway.usb.UsbAudioBridgeControl
 import com.callagent.gateway.usb.AudioBridgeStartResult
