@@ -58,6 +58,13 @@ android {
     }
 
     buildTypes {
+        debug {
+            // Keep the cloud/CLI debug APK installable beside the production
+            // release APK. The CLI transport is tested independently and
+            // must not require uninstalling the stable USB dialer.
+            applicationIdSuffix = ".cli"
+            versionNameSuffix = "-cli"
+        }
         release {
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
