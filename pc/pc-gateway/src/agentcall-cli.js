@@ -30,15 +30,26 @@ async function rpcCall(socketPath, method, args = {}) {
       });
       socket.write(request + '\n');
     });
-    socket.on('data', (chunk) => {
+    let buffer = '';
+    let settled = false;
+    const finish = (callback, value) => {
+      if (settled) return;
+      settled = true;
       clearTimeout(timeout);
-      const text = chunk.toString('utf8');
+      socket.end();
+      callback(value);
+    };
+    socket.on('data', (chunk) => {
+      buffer += chunk.toString('utf8');
+      const newline = buffer.indexOf('\n');
+      if (newline < 0) return;
+      const text = buffer.slice(0, newline);
       try {
         const response = JSON.parse(text);
-        if (response.error) reject(new Error(response.error.message ?? 'rpc error'));
-        else resolve(response.result);
-      } catch {
-        // partial read; accumulate
+        if (response.error) finish(reject, new Error(response.error.message ?? 'rpc error'));
+        else finish(resolve, response.result);
+      } catch (error) {
+        finish(reject, new Error(`invalid RPC response: ${error.message}`));
       }
     });
     socket.on('error', (err) => { clearTimeout(timeout); reject(err); });
