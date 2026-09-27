@@ -82,26 +82,73 @@ export class NetworkDeviceClient extends EventEmitter {
     if (this._state !== 'disconnected') return;
     this._state = 'connecting';
     this._metrics.connectionAttempts++;
-    await new Promise((resolve, reject) => {
-      const socket = net.createConnection({ host: this.host, port: this.port }, () => {
-        this._socket = socket;
-        this._state = 'connected';
-        this._startReadLoop();
-        this._startAuth();
-        resolve();
+    const socket = await new Promise((resolve, reject) => {
+      const connection = net.createConnection({ host: this.host, port: this.port });
+      const onError = (error) => { connection.destroy(); reject(error); };
+      connection.once('error', onError);
+      connection.once('connect', () => {
+        connection.removeListener('error', onError);
+        resolve(connection);
       });
-      socket.on('error', (err) => {
-        this._state = 'disconnected';
-        reject(err);
-      });
-      socket.on('close', () => {
-        if (this._state === 'connected' || this._state === 'connecting') {
-          this._state = 'disconnected';
-          this._onDisconnect('connection closed');
-        }
-      });
-      this._socket = socket;
     });
+    this._socket = socket;
+    try {
+      await this._authenticate(socket);
+      this._state = 'connected';
+      this._startReadLoop();
+    } catch (error) {
+      this._state = 'disconnected';
+      socket.destroy();
+      this._socket = null;
+      throw error;
+    }
+  }
+
+  async _authenticate(socket) {
+    if (!this._enrollmentSecret) return;
+    const helloBytes = 4 + AUTH_NONCE_BYTES;
+    const proofBytes = 4 + AUTH_PROOF_BYTES;
+    const timeoutMs = this.authTimeoutMs;
+    let buffer = Buffer.alloc(0);
+    const read = (bytes) => new Promise((resolve, reject) => {
+      const timer = setTimeout(() => { cleanup(); reject(new Error('controller authentication timed out')); }, timeoutMs);
+      const cleanup = () => {
+        clearTimeout(timer);
+        socket.removeListener('data', onData);
+        socket.removeListener('error', onError);
+        socket.removeListener('close', onClose);
+      };
+      const onError = (error) => { cleanup(); reject(error); };
+      const onClose = () => { cleanup(); reject(new Error('controller authentication socket closed')); };
+      const onData = (chunk) => {
+        buffer = Buffer.concat([buffer, chunk]);
+        if (buffer.length < bytes) return;
+        const value = Buffer.from(buffer.subarray(0, bytes));
+        buffer = Buffer.from(buffer.subarray(bytes));
+        cleanup();
+        resolve(value);
+      };
+      socket.on('data', onData);
+      socket.once('error', onError);
+      socket.once('close', onClose);
+      if (buffer.length >= bytes) onData(Buffer.alloc(0));
+    });
+    const hello = await read(helloBytes);
+    if (!hello.subarray(0, 4).equals(AUTH_MAGIC_SERVER_HELLO)) throw new Error('invalid controller server hello');
+    const serverNonce = hello.subarray(4);
+    const clientNonce = randomBytes(AUTH_NONCE_BYTES);
+    const clientProof = authProof(this._enrollmentSecret, AUTH_CLIENT_DOMAIN, serverNonce, clientNonce);
+    socket.write(Buffer.concat([AUTH_MAGIC_CLIENT_PROOF, clientNonce, clientProof]));
+    const response = await read(proofBytes);
+    if (!response.subarray(0, 4).equals(AUTH_MAGIC_SERVER_PROOF)) throw new Error('invalid controller server proof');
+    const expected = authProof(this._enrollmentSecret, AUTH_SERVER_DOMAIN, serverNonce, clientNonce);
+    const valid = timingSafeEqual(expected, response.subarray(4));
+    expected.fill(0);
+    if (!valid) throw new Error('controller server proof mismatch');
+    const sessionDigest = authProof(this._enrollmentSecret, AUTH_SESSION_DOMAIN, serverNonce, clientNonce);
+    this.sessionId = sessionDigest.readUInt32BE(0);
+    socket.write(sessionDigest);
+    serverNonce.fill(0); clientNonce.fill(0); clientProof.fill(0); sessionDigest.fill(0);
   }
 
   disconnect() {
