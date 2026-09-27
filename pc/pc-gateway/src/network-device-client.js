@@ -249,6 +249,7 @@ export class NetworkDeviceClient extends EventEmitter {
     }
     switch (frame.kind) {
       case KIND_CONTROL:
+        if (frame.direction !== DIR_DEVICE_TO_HOST) break;
         this._metrics.receivedControl++;
         this.emit('control', frame);
         break;
