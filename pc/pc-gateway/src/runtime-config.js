@@ -4,7 +4,7 @@ const SERIAL_RE = /^[A-Za-z0-9._-]{3,64}$/;
 const DEFAULT_RPC_SOCKET = '/run/agentcall/gatewayd.sock';
 const DEFAULT_RECORDING_ROOT = '/var/lib/agentcall/recordings';
 const DEFAULT_RECORDING_MIN_FREE_BYTES = 1024 * 1024 * 1024;
-const E164_RE = /^\+[1-9]\d{5,14}$/;
+export const E164_RE = /^\+[1-9]\d{5,14}$/;
 const REALTIME_MODELS = Object.freeze({
   stt: Object.freeze({
     openai: Object.freeze([
