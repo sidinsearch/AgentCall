@@ -11,8 +11,10 @@ import { socket as netSocket } from 'node:net';
 import { E164_RE } from './runtime-config.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const CONTROLLER_SECRET_FILE = join(__dirname, '..', '..', 'var', 'lib', 'agentcall', 'controller', 'controller.key');
-const REDACTION_SALT_FILE = join(__dirname, '..', '..', 'var', 'lib', 'agentcall', 'redaction-salt');
+const CONTROLLER_SECRET_FILE = process.env.AGENTCALL_CONTROLLER_SECRET_FILE
+  ?? '/var/lib/agentcall/controller/controller.key';
+const REDACTION_SALT_FILE = process.env.AGENTCALL_REDACTION_SALT_FILE
+  ?? '/var/lib/agentcall/redaction-salt';
 
 // ---- minimal RPC client over Unix socket ----
 

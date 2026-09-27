@@ -1,0 +1,28 @@
+[Unit]
+Description=AgentCall CLI cloud gateway
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=agentcall
+Group=agentcall
+WorkingDirectory=/opt/agentcall-cli/pc/pc-gateway
+Environment=HOME=/var/lib/agentcall
+Environment=AGENTCALL_MODE=network
+EnvironmentFile=-/etc/agentcall/cloud.env
+Environment=AGENTCALL_SOCKET_PATH=/run/agentcall/gatewayd.sock
+Environment=AGENTCALL_PHONE_PORT=27183
+Environment=AGENTCALL_CONTROLLER_SECRET_FILE=/var/lib/agentcall/controller/controller.key
+Environment=AGENTCALL_REDACTION_SALT_FILE=/var/lib/agentcall/redaction-salt
+Environment=AGENTCALL_RECORDING_REQUIRED=true
+Environment=AGENTCALL_DIAL_ENABLED=false
+ExecStart=/usr/bin/node /opt/agentcall-cli/pc/pc-gateway/src/gatewayd.js
+Restart=on-failure
+RestartSec=3
+RuntimeDirectory=agentcall
+StateDirectory=agentcall
+ReadWritePaths=/run/agentcall /var/lib/agentcall
+
+[Install]
+WantedBy=multi-user.target
