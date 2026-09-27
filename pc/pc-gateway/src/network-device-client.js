@@ -214,11 +214,11 @@ export class NetworkDeviceClient extends EventEmitter {
     try {
       socket.write(AUTH_MAGIC_SERVER_HELLO);
       socket.write(serverNonce);
-      socket.flush();
     } catch (e) {
       socket.destroy();
       this._state = 'disconnected';
-      this.emit('error', 'auth send failed');
+      if (this.listenerCount('error') > 0) this.emit('error', 'auth send failed');
+      this.emit('state', 'disconnected');
       return;
     }
 
