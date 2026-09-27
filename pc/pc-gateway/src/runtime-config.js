@@ -170,6 +170,8 @@ export function configFromEnv(env = process.env) {
       phonePort,
       phoneBootstrapPort,
       controllerSecretFile,
+      controllerCredentialStoreFile: env.AGENTCALL_CONTROLLER_CREDENTIAL_STORE_FILE
+        ?? `${controllerSecretFile}.record`,
       redactionSaltFile,
       gateway: {
         hostPort,
@@ -230,6 +232,8 @@ export function configFromEnv(env = process.env) {
     ...common,
     serial,
     controllerSecretFile,
+    controllerCredentialStoreFile: env.AGENTCALL_CONTROLLER_CREDENTIAL_STORE_FILE
+      ?? `${controllerSecretFile}.record`,
     redactionSaltFile,
     ...(bootstrap ? { bootstrap } : {}),
     gateway: {

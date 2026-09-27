@@ -342,7 +342,9 @@ export async function runGatewayd({
   const zeroTouch = config.mode === 'hardware' && config.bootstrap !== undefined;
   let controllerSecret = config.mode === 'simulator'
     ? randomBytes(32)
-    : (zeroTouch ? null : await loadControllerSecret(config.controllerSecretFile));
+    : (config.mode === 'network'
+      ? null
+      : (zeroTouch ? null : await loadControllerSecret(config.controllerSecretFile)));
   let simulator = null;
   let gateway = null;
   let rpc = null;
@@ -530,7 +532,7 @@ export async function runGatewayd({
 
     // Network mode: connect directly to phone over TCP, no ADB required.
     if (config.mode === 'network') {
-      const store = createControllerCredentialStore({ path: config.controllerSecretFile });
+      const store = createControllerCredentialStore({ path: config.controllerCredentialStoreFile });
       control = new LocalControlPlane({
         recording, providerSettings, agentAnswering, phoneData,
         checkProviderHealth, testProviders, prewarmSpeech,
