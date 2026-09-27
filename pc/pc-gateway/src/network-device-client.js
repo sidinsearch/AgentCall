@@ -244,6 +244,9 @@ export class NetworkDeviceClient extends EventEmitter {
   }
 
   _onFrame(frame) {
+    if (process.env.AGENTCALL_DEBUG_NETWORK === '1') {
+      process.stderr.write(`network frame kind=${frame.kind} direction=${frame.direction} session=${frame.sessionId} bytes=${frame.payload.length} payload=${frame.payload.toString('utf8')}\\n`);
+    }
     switch (frame.kind) {
       case KIND_CONTROL:
         this._metrics.receivedControl++;
