@@ -44,7 +44,8 @@ for path in (source_manifest, merged_manifest):
     }
     expected = set(EXPECTED)
     if path == merged_manifest:
-        expected.add("com.callagent.gateway.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION")
+        package_name = root.attrib.get("package", "com.callagent.gateway")
+        expected.add(package_name + ".DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION")
     if actual != expected:
         extra = sorted(actual - expected)
         missing = sorted(expected - actual)
