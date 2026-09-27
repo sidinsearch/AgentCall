@@ -153,7 +153,7 @@ class NetworkGatewayActivity : AppCompatActivity() {
     reject.visibility = if (state.call.canReject) View.VISIBLE else View.GONE
     hangup.visibility = if (!state.call.canAnswer && state.call.phase != GatewayUiState.CallPhase.ENDED) View.VISIBLE else View.GONE
 
-    if (serverSocket != null && listening.get()) {
+    if (listening.get()) {
       testBind.visibility = View.GONE
       stopBind.visibility = View.VISIBLE
       portInput.isEnabled = false
@@ -188,22 +188,17 @@ class NetworkGatewayActivity : AppCompatActivity() {
       return
     }
     val port = readPortPreference(27183) ?: 27183
-    try {
-      serverSocket = ServerSocket()
-      serverSocket!!.bind(InetSocketAddress("0.0.0.0", port), 5)
-      listening.set(true)
-      render(GatewayStateStore.snapshot())
-      startForegroundServiceIfNecessary()
-    } catch (e: IOException) {
-      Toast.makeText(
-        this,
-        getString(R.string.network_bind_failed),
-        Toast.LENGTH_LONG
-      ).show()
-      serverSocket = null
-      listening.set(false)
-      render(GatewayStateStore.snapshot())
+    if (port != NetworkGatewayServer.BIND_PORT) {
+      Toast.makeText(this, "Network gateway currently supports port 27183", Toast.LENGTH_LONG).show()
+      portInput.setText(NetworkGatewayServer.BIND_PORT.toString())
+      return
     }
+    // The service owns the real authenticated listener. Do not open a
+    // placeholder ServerSocket here: that would occupy 27183 and make the
+    // service fail with EADDRINUSE while the UI falsely reports success.
+    listening.set(true)
+    render(GatewayStateStore.snapshot())
+    startForegroundServiceIfNecessary()
   }
 
   private fun stopListener() {
@@ -213,9 +208,7 @@ class NetworkGatewayActivity : AppCompatActivity() {
 
   private fun stopListenerQuietly() {
     listening.set(false)
-    try {
-      serverSocket?.close()
-    } catch (_: IOException) { }
+    stopService(Intent(this, NetworkGatewayService::class.java).setAction(NetworkGatewayService.ACTION_STOP))
     serverSocket = null
     testBind.visibility = View.VISIBLE
     stopBind.visibility = View.GONE
