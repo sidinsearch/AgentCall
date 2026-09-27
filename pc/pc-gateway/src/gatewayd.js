@@ -626,6 +626,7 @@ export async function runGatewayd({
             }
           });
         } catch (error) {
+          process.stderr.write(`network phone connection failed: ${error?.stack || error}\n`);
           const message = `${error?.message ?? ''}`.toLowerCase();
           let failureStage = 'WAITING_FOR_PHONE';
           let failureReason = 'phone_not_connected';
