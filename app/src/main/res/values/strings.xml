@@ -59,4 +59,8 @@
     <string name="network_default_port_hint">27183</string>
     <string name="network_listener_bound">Listening on port %1$d</string>
     <string name="network_listener_stopped">Listener stopped</string>
+    <string name="desktop_pairing">Desktop pairing</string>
+    <string name="desktop_not_paired">Desktop · NOT PAIRED</string>
+    <string name="forget_paired_desktop">Forget paired desktop</string>
+    <string name="system_readiness">System readiness</string>
 </resources>

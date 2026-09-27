@@ -1,0 +1,74 @@
+name: CLI Build Artifacts
+
+on:
+  push:
+    branches: [cli]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cli-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  android:
+    name: Android APK
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android build packages
+        run: sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0"
+
+      - name: Build debug APK
+        run: ./gradlew :app:assembleDebug --no-daemon
+
+      - name: Upload Android APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: agentcall-cli-android-apk
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+
+  desktop:
+    name: Linux Desktop Package
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: pc/pc-gateway/ui/package-lock.json
+
+      - name: Install desktop dependencies
+        run: npm ci --prefix pc/pc-gateway/ui --no-audit --no-fund
+
+      - name: Build Debian package
+        working-directory: pc/pc-gateway/ui
+        run: npm run dist
+
+      - name: Upload desktop package
+        uses: actions/upload-artifact@v4
+        with:
+          name: agentcall-cli-desktop-deb
+          path: pc/pc-gateway/ui/dist/*.deb
+          if-no-files-found: error

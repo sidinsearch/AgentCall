@@ -245,14 +245,12 @@ class NetworkGatewayActivity : AppCompatActivity() {
       }
     }
     val bound = try {
-      val s = ServerSocket()
-      s.bind(InetSocketAddress("0.0.0.0", port), 2)
+      ServerSocket().use { socket ->
+        socket.bind(InetSocketAddress("0.0.0.0", port), 2)
+      }
       getString(R.string.network_bind_ok, port)
     } catch (e: IOException) {
       getString(R.string.network_bind_failed)
-    } finally {
-      // socket closed by try-with-resources pattern not available in older Kotlin;
-      // the ServerSocket is explicitly closed below
     }
     Toast.makeText(this, bound, Toast.LENGTH_LONG).show()
   }
