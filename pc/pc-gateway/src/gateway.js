@@ -47,13 +47,13 @@ export class Gateway extends EventEmitter {
       serverSocket: options.adbServerSocket,
       expectedIdentity: options.expectedIdentity,
     };
-    this.adb = isNetworkMode
+    this.adb = options.adb ?? (isNetworkMode
       ? new NetworkAdbManager({
           phoneHost: options.phoneHost,
           phonePort: options.phonePort,
           expectedIdentity: options.expectedIdentity,
         })
-      : new AdbManager(adbOptions);
+      : new AdbManager(adbOptions));
     if (!options.device && (!Buffer.isBuffer(options.controllerSecret) || options.controllerSecret.length !== 32)) {
       throw new Error('controller secret must be exactly 32 bytes');
     }
