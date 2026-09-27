@@ -52,6 +52,9 @@ jobs:
           npm ci --prefix pc/pc-gateway --ignore-scripts --no-audit --no-fund
           npm ci --prefix pc/pc-gateway/ui --ignore-scripts --no-audit --no-fund
 
+      - name: Prepare isolated ADB home for integration tests
+        run: sudo install -d -m 700 /var/lib/agentcall/adb/.android
+
       - name: Verify integrated product
         run: ./verify.sh
 
