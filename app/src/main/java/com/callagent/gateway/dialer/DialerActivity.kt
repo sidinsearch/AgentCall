@@ -26,7 +26,7 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.callagent.gateway.R
 import com.callagent.gateway.gsm.GsmCallManager
-import com.callagent.gateway.network.NetworkGatewayActivity
+import com.callagent.gateway.dialer.GatewayActivity
 import com.callagent.gateway.usb.GatewayStateStore
 import com.callagent.gateway.usb.GatewayUiState
 import com.callagent.gateway.usb.UsbGatewayActivity
@@ -526,19 +526,7 @@ class DialerActivity : AppCompatActivity() {
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).roundToInt()
 
     private fun showGatewayModeDialog() {
-      AlertDialog.Builder(this)
-        .setTitle("Open gateway")
-        .setMessage("Choose how the desktop will connect to this phone.")
-        .setPositiveButton("USB · Cable") { _, _ ->
-          startActivity(Intent(this, UsbGatewayActivity::class.java))
-        }
-        .setNegativeButton("Network · Wi‑Fi / Internet") { _, _ ->
-          startActivity(Intent(this, NetworkGatewayActivity::class.java))
-        }
-        .setOnCancelListener {
-          // User cancelled the dialog; nothing to clean up.
-        }
-        .show()
+        startActivity(Intent(this, GatewayActivity::class.java))
     }
 
     private companion object {

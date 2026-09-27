@@ -54,6 +54,11 @@
             android:turnScreenOn="true" />
 
         <activity
+            android:name=".dialer.GatewayActivity"
+            android:exported="false"
+            android:label="Gateway" />
+
+        <activity
             android:name=".dialer.DialerActivity"
             android:exported="true"
             android:label="AgentCall"
