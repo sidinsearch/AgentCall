@@ -210,8 +210,7 @@ export class NetworkDeviceClient extends EventEmitter {
     if (!socket) return;
     const originalTimeout = socket.timeout;
     socket.timeout = this.authTimeoutMs;
-    const serverNonce = Buffer.alloc(AUTH_NONCE_BYTES);
-    randomBytes(serverNonce);
+    const serverNonce = randomBytes(AUTH_NONCE_BYTES);
     try {
       socket.write(AUTH_MAGIC_SERVER_HELLO);
       socket.write(serverNonce);
