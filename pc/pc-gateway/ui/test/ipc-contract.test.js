@@ -17,6 +17,7 @@ test('IPC exposes only the declared channel allowlist', () => {
     'action:provider-test',
     'action:recording',
     'config:agent-answering',
+    'config:network',
     'config:secret',
     'data:read',
     'policy:authorize-download',

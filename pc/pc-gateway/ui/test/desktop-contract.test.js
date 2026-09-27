@@ -75,8 +75,8 @@ test('IPC handlers register declared channels once and authorize the canonical m
   const rendererUrl = 'file:///opt/agentcall/resources/app.asar/renderer/index.html';
 
   registerIpcHandlers(ipcMain, { rendererUrl });
-  assert.equal(registered.filter((entry) => entry.startsWith('handle:')).length, 12);
-  assert.equal(registered.filter((entry) => entry.startsWith('remove:')).length, 12);
+  assert.equal(registered.filter((entry) => entry.startsWith('handle:')).length, 13);
+  assert.equal(registered.filter((entry) => entry.startsWith('remove:')).length, 13);
 
   const mainFrame = { url: rendererUrl };
   const sender = { mainFrame };
