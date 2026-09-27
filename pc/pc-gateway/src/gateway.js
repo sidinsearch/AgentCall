@@ -165,14 +165,8 @@ export class Gateway extends EventEmitter {
       }
       if (value.event === 'contacts_snapshot_v1' || value.event === 'call_log_snapshot_v1') {
         this.phoneDataWork = this.phoneDataWork.then(async () => {
-          if (!await this.phoneData?.consume?.(value)) {
-            if (process.env.AGENTCALL_DEBUG_NETWORK === '1') process.stderr.write(`phone data rejected: ${JSON.stringify(value)}\\n`);
-            this.metrics.malformedDeviceMessages++;
-          }
-        }).catch((error) => {
-          if (process.env.AGENTCALL_DEBUG_NETWORK === '1') process.stderr.write(`phone data processing failed: ${error?.stack || error}\\n`);
-          this.metrics.malformedDeviceMessages++;
-        });
+          if (!await this.phoneData?.consume?.(value)) this.metrics.malformedDeviceMessages++;
+        }).catch(() => { this.metrics.malformedDeviceMessages++; });
         return;
       }
       if (value.event === 'incoming') this._queueRecording(() => this._handleIncoming(value));
@@ -212,9 +206,6 @@ export class Gateway extends EventEmitter {
   _emitDeviceJson(name, frame) {
     const value = parseJsonFrame(frame);
     if (!value) {
-      if (process.env.AGENTCALL_DEBUG_NETWORK === '1') {
-        process.stderr.write(`malformed device JSON kind=${frame.kind} payload=${frame.payload.toString('utf8')}\\n`);
-      }
       this.metrics.malformedDeviceMessages++;
       return;
     }
@@ -656,6 +647,7 @@ export class Gateway extends EventEmitter {
           port: simulator ? phonePort : isNetworkMode ? phonePort : this.hostPort,
         });
       }
+      this.state = 'running';
       await this.device.sendControl({
         direction: DIR_HOST_TO_DEVICE,
         payload: Buffer.from(JSON.stringify({ command: 'capabilities' }), 'utf8'),
