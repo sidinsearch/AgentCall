@@ -16,6 +16,7 @@ import android.os.IBinder
 import android.os.Handler
 import android.os.Looper
 import android.os.PowerManager
+import android.os.Process
 import android.util.Log
 import com.callagent.gateway.DeviceSelector
 import com.callagent.gateway.FileApprovedDeviceEvidenceProvider
@@ -267,7 +268,7 @@ class NetworkGatewayService : Service() {
                 val outcome = bridge.start(
                     facts = audioFacts(),
                     downlinkSink = UsbPcmDownlinkSink(currentServer::sendPcm),
-                    uplinkSource = UsbPcmUplinkSource(currentServer.pollDownlinkInto ?: return false),
+                    uplinkSource = UsbPcmUplinkSource(currentServer.downlinkPollerForCurrentGeneration() ?: return false),
                     listener = object : LifecycleListener {
                         override fun onWorkerFailure(reason: String) {
                             GatewayStateStore.update(

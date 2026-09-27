@@ -539,6 +539,20 @@ class NetworkGatewayServer(
 
     fun connectedClientCount(): Int = connectedClients.get()
     fun cleanupCount(): Int = cleanupCount.get()
+    fun awaitCleanupCount(target: Int, timeout: Long, unit: TimeUnit): Boolean {
+        val deadline = System.currentTimeMillis() + unit.toMillis(timeout)
+        while (System.currentTimeMillis() < deadline) {
+            if (cleanupCount.get() >= target) return true
+            Thread.sleep(10)
+        }
+        return cleanupCount.get() >= target
+    }
+
+    fun downlinkPollerForCurrentGeneration(): ((ByteArray) -> Boolean)? = synchronized(connectionLock) {
+        val generation = currentGeneration
+        if (generation == NO_GENERATION) null else { destination -> downlinkQueue.pollInto(generation, destination) }
+    }
+
     fun pollDownlinkInto(destination: ByteArray): Boolean {
         val generation = currentGeneration
         return generation != NO_GENERATION && downlinkQueue.pollInto(generation, destination)
