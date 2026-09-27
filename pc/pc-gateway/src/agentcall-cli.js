@@ -61,6 +61,8 @@ async function cmdDial(socketPath, destination, consentPolicy) {
     approved: true,
     consent: { recorded: true, policy: consentPolicy ?? 'CLI dial consent' },
     destination,
+    openingText: 'Hello, this is AgentCall. Can you hear me clearly?',
+    preparedReplies: ['Yes, I can hear you clearly.', 'The audio sounds good.'],
     idempotencyKey: `cli-dial-${Date.now()}`,
   });
   console.log(JSON.stringify(result, null, 2));
@@ -113,9 +115,10 @@ async function cmdGenerateSecret() {
   const dir = dirname(CONTROLLER_SECRET_FILE);
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true, mode: 0o700 });
   writeFileSync(CONTROLLER_SECRET_FILE, secret, { mode: 0o640 });
+  const encoded = secret.toString('hex');
   secret.fill(0);
   console.log('Controller secret generated at: ' + CONTROLLER_SECRET_FILE);
-  console.log('Secret (hex, for phone pairing): ' + randomBytes(32).toString('hex')); // placeholder — actual secret is in the file
+  console.log('Secret (hex, for phone pairing): ' + encoded);
 }
 
 // ---- main ----
