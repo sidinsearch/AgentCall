@@ -250,24 +250,21 @@ export class NetworkDeviceClient extends EventEmitter {
     switch (frame.kind) {
       case KIND_CONTROL:
         this._metrics.receivedControl++;
-        this.emit('control', frame.payload);
+        this.emit('control', frame);
         break;
       case KIND_EVENT:
         this._metrics.receivedEvent++;
-        if (process.env.AGENTCALL_DEBUG_NETWORK === '1') {
-          process.stderr.write(`network event: ${frame.payload.toString('utf8')}\\n`);
-        }
-        this.emit('event', frame.payload);
+        this.emit('event', frame);
         break;
       case KIND_PCM:
         if (frame.direction === DIR_HOST_TO_DEVICE) {
           this._metrics.receivedPcm++;
-          this.emit('pcm', frame.payload);
+          this.emit('pcm', frame);
         }
         break;
       case KIND_ARTIFACT:
         this._metrics.receivedArtifact++;
-        this.emit('artifact', frame.payload);
+        this.emit('artifact', frame);
         break;
     }
   }
