@@ -171,7 +171,7 @@ export class NetworkDeviceClient extends EventEmitter {
   _startReadLoop() {
     const socket = this._socket;
     socket.on('data', (chunk) => {
-      const frames = this._acc.feed(chunk);
+      const frames = this._acc.push(chunk);
       for (const frame of frames) {
         this._onFrame(frame);
       }
