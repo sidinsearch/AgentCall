@@ -251,6 +251,9 @@ export class NetworkDeviceClient extends EventEmitter {
         break;
       case KIND_EVENT:
         this._metrics.receivedEvent++;
+        if (process.env.AGENTCALL_DEBUG_NETWORK === '1') {
+          process.stderr.write(`network event: ${frame.payload.toString('utf8')}\\n`);
+        }
         this.emit('event', frame.payload);
         break;
       case KIND_PCM:
