@@ -641,13 +641,13 @@ export class Gateway extends EventEmitter {
         }
       }
       if (this.recording?.health) this.recordingHealth = await this.recording.health();
+      this.state = 'running';
       if (this.device.state !== 'connected') {
         await this.device.connect({
           host: isNetworkMode ? phoneHost : '127.0.0.1',
           port: simulator ? phonePort : isNetworkMode ? phonePort : this.hostPort,
         });
       }
-      this.state = 'running';
       await this.device.sendControl({
         direction: DIR_HOST_TO_DEVICE,
         payload: Buffer.from(JSON.stringify({ command: 'capabilities' }), 'utf8'),
