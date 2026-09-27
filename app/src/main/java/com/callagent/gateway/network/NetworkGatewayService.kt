@@ -158,10 +158,11 @@ class NetworkGatewayService : Service() {
                 qualificationHandler.post {
                     if (started.get() && lifecycleGeneration.get() == expectedGeneration) {
                         notifyStatus("Desktop pairing timed out")
-                        stopGateway(GatewayUiEvent.Error("Desktop pairing timed out. Tap Connect desktop to try again."))
+                        stopGateway(GatewayUiEvent.Error("Desktop pairing timed out. Tap Connect desktop to retry."))
                     }
                 }
             },
+            bindHost = "0.0.0.0",
         )
         bootstrapServer = bootstrap
         try {

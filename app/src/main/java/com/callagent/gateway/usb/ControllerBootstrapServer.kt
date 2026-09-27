@@ -25,6 +25,7 @@ class ControllerBootstrapServer(
     private val onExpired: () -> Unit = {},
     private val authorization: BootstrapAuthorizationWindow = BootstrapAuthorizationWindow(System.currentTimeMillis()),
     private val listenerDeadlineMillis: Long = BootstrapAuthorizationWindow.DEFAULT_DURATION_MILLIS,
+    private val bindHost: String = LOOPBACK_HOST,
 ) {
     init { require(listenerDeadlineMillis in 1..BootstrapAuthorizationWindow.MAX_DURATION_MILLIS) }
     private val running = AtomicBoolean(false)
@@ -33,7 +34,7 @@ class ControllerBootstrapServer(
 
     fun start() {
         check(running.compareAndSet(false, true)) { "bootstrap listener already running" }
-        listener = ServerSocket(BOOTSTRAP_PORT, 1, InetAddress.getByName(LOOPBACK_HOST))
+        listener = ServerSocket(BOOTSTRAP_PORT, 1, InetAddress.getByName(bindHost))
         Thread(::acceptOne, "controller-bootstrap-accept").apply { isDaemon = true; start() }
         Thread({
             try { Thread.sleep(listenerDeadlineMillis) }
