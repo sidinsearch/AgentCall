@@ -206,6 +206,9 @@ export class Gateway extends EventEmitter {
   _emitDeviceJson(name, frame) {
     const value = parseJsonFrame(frame);
     if (!value) {
+      if (process.env.AGENTCALL_DEBUG_NETWORK === '1') {
+        process.stderr.write(`malformed device JSON kind=${frame.kind} payload=${frame.payload.toString('utf8')}\\n`);
+      }
       this.metrics.malformedDeviceMessages++;
       return;
     }
