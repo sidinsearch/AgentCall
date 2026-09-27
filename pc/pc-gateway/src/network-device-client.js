@@ -163,29 +163,41 @@ export class NetworkDeviceClient extends EventEmitter {
     this.emit('disconnected');
   }
 
-  sendControl(payload) {
-    return this._enqueue(KIND_CONTROL, DIR_HOST_TO_DEVICE, payload);
+  sendControl({ direction = DIR_HOST_TO_DEVICE, sequence, timestampMicros, payload, flags = 0 } = {}) {
+    if (!Buffer.isBuffer(payload)) return Promise.reject(new TypeError('payload must be a Buffer'));
+    return Promise.resolve(this._enqueueFrame(encodeControlFrame({
+      direction, sessionId: this.sessionId, sequence: sequence ?? this._txSeq++,
+      timestampMicros: timestampMicros ?? BigInt(Date.now()) * 1000n, payload, flags,
+    })));
   }
 
-  sendEvent(payload) {
-    return this._enqueue(KIND_EVENT, DIR_HOST_TO_DEVICE, payload);
+  sendEvent({ direction = DIR_HOST_TO_DEVICE, sequence, timestampMicros, payload, flags = 0 } = {}) {
+    if (!Buffer.isBuffer(payload)) return Promise.reject(new TypeError('payload must be a Buffer'));
+    return Promise.resolve(this._enqueueFrame(encodeEventFrame({
+      direction, sessionId: this.sessionId, sequence: sequence ?? this._txSeq++,
+      timestampMicros: timestampMicros ?? BigInt(Date.now()) * 1000n, payload, flags,
+    })));
   }
 
-  sendPcm(payload) {
-    return this._enqueue(KIND_PCM, DIR_HOST_TO_DEVICE, payload);
+  sendPcm({ direction = DIR_HOST_TO_DEVICE, sequence, timestampMicros, payload, flags = 0 } = {}) {
+    if (!Buffer.isBuffer(payload)) return Promise.reject(new TypeError('payload must be a Buffer'));
+    return Promise.resolve(this._enqueueFrame(encodePcmFrame({
+      direction, sessionId: this.sessionId, sequence: sequence ?? this._txSeq++,
+      timestampMicros: timestampMicros ?? BigInt(Date.now()) * 1000n, payload, flags,
+    })));
   }
 
-  sendArtifact(payload) {
-    return this._enqueue(KIND_ARTIFACT, DIR_HOST_TO_DEVICE, payload);
+  sendArtifact({ direction = DIR_HOST_TO_DEVICE, sequence, timestampMicros, payload, flags = 0 } = {}) {
+    if (!Buffer.isBuffer(payload)) return Promise.reject(new TypeError('payload must be a Buffer'));
+    return Promise.resolve(this._enqueueFrame(encodeArtifactFrame({
+      direction, sessionId: this.sessionId, sequence: sequence ?? this._txSeq++,
+      timestampMicros: timestampMicros ?? BigInt(Date.now()) * 1000n, payload, flags,
+    })));
   }
 
-  _enqueue(kind, direction, payload) {
+  _enqueueFrame(frame) {
     if (this._state !== 'connected' || !this._socket || !this._socket.writable) return false;
-    const frame = encodeFrame({ kind, direction, sessionId: this.sessionId, sequence: this._txSeq++, timestampMicros: BigInt(Date.now()) * 1000n, payload });
-    if (this._sendQueue.length >= this.sendQueueLimit) {
-      this._metrics.sentPcm = this._metrics.sentPcm + (kind === KIND_PCM ? 1 : 0);
-      return false; // backpressure: drop
-    }
+    if (this._sendQueue.length >= this.sendQueueLimit) return false;
     this._sendQueue.push(frame);
     this._flush();
     return true;
