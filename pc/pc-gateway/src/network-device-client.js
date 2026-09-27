@@ -96,6 +96,11 @@ export class NetworkDeviceClient extends EventEmitter {
       await this._authenticate(socket);
       this._state = 'connected';
       this._startReadLoop();
+      if (this._authRemainder?.length) {
+        const remainder = this._authRemainder;
+        this._authRemainder = null;
+        for (const frame of this._acc.push(remainder)) this._onFrame(frame);
+      }
     } catch (error) {
       this._state = 'disconnected';
       socket.destroy();
@@ -148,6 +153,7 @@ export class NetworkDeviceClient extends EventEmitter {
     const sessionDigest = authProof(this._enrollmentSecret, AUTH_SESSION_DOMAIN, serverNonce, clientNonce);
     this.sessionId = sessionDigest.readUInt32BE(0);
     socket.write(sessionDigest);
+    this._authRemainder = buffer;
     serverNonce.fill(0); clientNonce.fill(0); clientProof.fill(0); sessionDigest.fill(0);
   }
 
