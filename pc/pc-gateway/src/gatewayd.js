@@ -724,8 +724,8 @@ export function isGatewaydEntrypoint(argv = process.argv, moduleUrl = import.met
 if (isGatewaydEntrypoint()) {
   try {
     await runGatewayd();
-  } catch {
-    process.stderr.write('gatewayd start failed\n');
+  } catch (error) {
+    process.stderr.write(`gatewayd start failed: ${error?.stack || error}\n`);
     process.exitCode = 1;
   }
 }
