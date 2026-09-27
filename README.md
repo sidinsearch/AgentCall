@@ -1,7 +1,7 @@
 <div align="center">
   <img src="docs/assets/agentcall-icon.png" width="128" alt="AgentCall application icon">
   <h1>AgentCall</h1>
-  <p><strong>Private, USB-only cellular calling for local AI agents.</strong></p>
+  <p><strong>Private USB and network cellular calling for local AI agents.</strong></p>
   <p>Turn a rooted Android phone into a secure voice endpoint for Hermes, OpenClaw, and Human Desktop Operators.</p>
 
   <p>
@@ -32,7 +32,7 @@
 ## Overview
 
 AgentCall connects an Android default-dialer application to a Windows or Linux
-desktop through one authenticated USB cable. It supports real cellular calls,
+agent through an authenticated USB cable or a Tailscale/LAN network link. It supports real cellular calls,
 PC microphone and speaker mode, realtime STT/TTS, local recordings, phone-data
 synchronization, and semantic call control from Hermes or OpenClaw over MCP.
 
@@ -52,7 +52,7 @@ synchronization, and semantic call control from Hermes or OpenClaw over MCP.
 | Android application | Android 8.0 / API 26 or newer |
 | Privileged reference phone | Xiaomi POCO M2 Pro (`gram`, Qualcomm `atoll`), tested Android 15 / API 35, Magisk 30.7, SELinux Enforcing |
 | Desktop | Windows 10/11 x86-64 or Debian/Ubuntu-compatible x86-64 Linux |
-| Connection | One physical USB phone through an authorized ADB host |
+| Connection | USB/ADB or authenticated network mode through Tailscale/LAN |
 | Local agents | Hermes Agent or OpenClaw through MCP `2024-11-05` over stdio |
 | Speech | OpenAI, ElevenLabs, and local Supertonic provider paths |
 
@@ -82,13 +82,13 @@ audio is enabled.
 
 ## Quick start
 
-1. Download the desktop package and **one** Android installation artifact from
+1. Download the CLI package and **one** Android installation artifact from
    [AgentCall Releases](https://github.com/sidinsearch/AgentCall/releases).
 2. Verify the downloaded files against `SHA256SUMS`.
 3. Install either the standalone APK or the matched Magisk module—never both.
 4. Select AgentCall as Android's default Phone application.
-5. Install AgentCall Desktop, connect one authorized USB phone, and press
-   **Connect desktop** in the Android app.
+5. Choose **USB · Cable** for local ADB, or **Network · Wi-Fi / Internet** and
+   configure the phone's reachable address and port (default `27183`).
 6. Configure speech under **Speech**, then copy the OS-specific MCP command
    from **MCP** if Hermes or OpenClaw will operate calls.
 
@@ -96,6 +96,51 @@ audio is enabled.
 > Disable BCR or any other call recorder before hardware testing. Two
 > applications competing for Android's in-call capture device can produce
 > silent or unstable audio.
+
+## CLI cloud deployment
+
+The CLI branch is designed for an agent host rather than a desktop-only workflow.
+The cloud gateway runs as `agentcall-gatewayd`, exposes a local Unix RPC socket,
+and connects outbound to the phone. The Android app remains the only telephony
+endpoint.
+
+```bash
+# On the cloud VM (Debian/Ubuntu)
+git clone --branch cli https://github.com/sidinsearch/AgentCall.git agentcall-cli
+cd agentcall-cli
+npm --prefix pc/pc-gateway ci --ignore-scripts
+sudo AGENTCALL_BRANCH=cli bash packaging/cloud/install.sh
+sudo systemctl enable --now agentcall-gatewayd
+
+# Configure the phone endpoint before starting calls
+sudo install -d -m 0750 /etc/agentcall
+sudo tee /etc/agentcall/cloud.env >/dev/null <<'EOF'
+AGENTCALL_MODE=network
+AGENTCALL_PHONE_HOST=100.78.220.18
+AGENTCALL_PHONE_PORT=27183
+EOF
+sudo systemctl restart agentcall-gatewayd
+systemctl is-active agentcall-gatewayd
+```
+
+Use the CLI against the local gateway:
+
+```bash
+node pc/pc-gateway/src/agentcall-cli.js status
+node pc/pc-gateway/src/agentcall-cli.js dial +15551234567
+node pc/pc-gateway/src/agentcall-cli.js hangup
+```
+
+For Hermes, OpenClaw, Codex, Claude, or another agent, run the MCP server as a
+local stdio process; do not expose the MCP socket directly to the internet:
+
+```bash
+node pc/pc-gateway/src/mcp-server.js
+```
+
+Pair the phone from the Android Network Gateway screen before issuing calls.
+The gateway fails closed when the phone is unreachable, pairing is invalid,
+recording is unavailable, or the configured provider is unhealthy.
 
 ## Architecture
 
@@ -109,10 +154,10 @@ flowchart LR
     Gateway <--> Speech["OpenAI / ElevenLabs<br/>Local Supertonic"]
 ```
 
-The supported runtime has no SIP, RTP, Asterisk, STUN, LAN call listener,
-Wi-Fi phone transport, or remote MCP endpoint. Android listens on loopback,
-the gateway owns the ADB forward, and desktop/MCP clients use bounded local
-interfaces. See the full [architecture](docs/ARCHITECTURE.md) and
+The supported runtime has no SIP, RTP, Asterisk, STUN, or remote MCP endpoint.
+USB mode uses ADB forwarding; network mode uses an authenticated phone listener
+and should be restricted to a private Tailscale/LAN path. See the full
+[architecture](docs/ARCHITECTURE.md) and
 [threat model](docs/security/threat-model-and-recording-controls.md).
 
 ## Agent and speech integrations
