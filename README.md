@@ -118,6 +118,7 @@ sudo tee /etc/agentcall/cloud.env >/dev/null <<'EOF'
 AGENTCALL_MODE=network
 AGENTCALL_PHONE_HOST=100.78.220.18
 AGENTCALL_PHONE_PORT=27183
+AGENTCALL_PHONE_BOOTSTRAP_PORT=27184
 EOF
 sudo systemctl restart agentcall-gatewayd
 systemctl is-active agentcall-gatewayd

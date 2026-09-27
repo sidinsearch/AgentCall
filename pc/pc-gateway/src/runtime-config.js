@@ -130,6 +130,7 @@ export function configFromEnv(env = process.env) {
   }
   const hostPort = port(env, 'AGENTCALL_HOST_PORT', 5040);
   const phonePort = port(env, 'AGENTCALL_PHONE_PORT', 27183);
+  const phoneBootstrapPort = port(env, 'AGENTCALL_PHONE_BOOTSTRAP_PORT', phonePort + 1);
   const common = {
     mode,
     recording: recordingConfig(env),
@@ -167,6 +168,7 @@ export function configFromEnv(env = process.env) {
       ...common,
       phoneHost,
       phonePort,
+      phoneBootstrapPort,
       controllerSecretFile,
       redactionSaltFile,
       gateway: {

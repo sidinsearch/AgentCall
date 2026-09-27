@@ -569,13 +569,13 @@ export async function runGatewayd({
             if (!controllerSecret) throw new Error('committed controller credential is missing');
             await g2Authenticate(controllerSecret);
           } else if (recovery.state === 'staged') {
-            const transport = createNetworkBootstrapTransport({ host: config.phoneHost, port: config.phonePort });
+            const transport = createNetworkBootstrapTransport({ host: config.phoneHost, port: config.phoneBootstrapPort });
             const client = createBootstrapClient({ store, transport, g2Authenticate });
             await client.recover(recovery);
             controllerSecret = await store.load();
           } else if (recovery.state === 'absent') {
             control.setStage('WAITING_FOR_PHONE_START', 'phone_start_required');
-            const transport = createNetworkBootstrapTransport({ host: config.phoneHost, port: config.phonePort });
+            const transport = createNetworkBootstrapTransport({ host: config.phoneHost, port: config.phoneBootstrapPort });
             const client = createBootstrapClient({ store, transport, g2Authenticate });
             const identity = {
               serial: 'NETWORK-PHONE',
