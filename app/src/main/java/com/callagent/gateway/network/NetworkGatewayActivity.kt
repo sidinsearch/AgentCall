@@ -157,7 +157,7 @@ class NetworkGatewayActivity : AppCompatActivity() {
       testBind.visibility = View.GONE
       stopBind.visibility = View.VISIBLE
       portInput.isEnabled = false
-      portInput.setText(serverSocket!!.localPort.toString())
+      portInput.setText(NetworkGatewayServer.BIND_PORT.toString())
     } else {
       testBind.visibility = View.VISIBLE
       stopBind.visibility = View.GONE
