@@ -7,7 +7,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { createReadStream, createWriteStream, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { socket as netSocket } from 'node:net';
+import * as netSocket from 'node:net';
 import { E164_RE } from './runtime-config.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
