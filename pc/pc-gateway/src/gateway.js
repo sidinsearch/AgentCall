@@ -287,7 +287,10 @@ export class Gateway extends EventEmitter {
       this.phoneData?.setCapabilities?.(value.values);
       for (const request of this.phoneData?.syncRequests?.() ?? []) {
         this.phoneDataWork = this.phoneDataWork.then(() => this._sendControl(request))
-          .catch(() => { this.metrics.malformedDeviceMessages++; });
+          .catch((error) => {
+            if (process.env.AGENTCALL_DEBUG_NETWORK === '1') process.stderr.write(`phone data request failed: ${error?.stack || error}\\n`);
+            this.metrics.malformedDeviceMessages++;
+          });
       }
       if (this.phoneRecordingSyncSupported && this.pendingPhoneRecordingSyncs.size > 0) {
         this.recordingWork = this.recordingWork
