@@ -30,9 +30,8 @@ jobs:
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
-
-      - name: Install Android build packages
-        run: sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0"
+        with:
+          packages: "platform-tools platforms;android-34 build-tools;34.0.0"
 
       - name: Build debug APK
         run: ./gradlew :app:assembleDebug --no-daemon
