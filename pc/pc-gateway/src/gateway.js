@@ -57,7 +57,7 @@ export class Gateway extends EventEmitter {
     if (!options.device && (!Buffer.isBuffer(options.controllerSecret) || options.controllerSecret.length !== 32)) {
       throw new Error('controller secret must be exactly 32 bytes');
     }
-    this.device = options.device ?? isNetworkMode
+    this.device = options.device ?? (isNetworkMode
       ? new NetworkDeviceClient({
           host: options.phoneHost,
           port: options.phonePort,
@@ -65,7 +65,7 @@ export class Gateway extends EventEmitter {
         })
       : new DeviceClient({
           enrollmentSecret: Buffer.from(options.controllerSecret),
-        });
+        }));
     this.hostPort = options.hostPort;
     this.phonePort = options.phonePort;
     this.idempotencySalt = options.idempotencySalt ?? 'agentcall-local';
