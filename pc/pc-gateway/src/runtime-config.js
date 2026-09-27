@@ -178,6 +178,14 @@ export function configFromEnv(env = process.env) {
         policy: dialPolicy(env),
       },
       start: { phoneHost, phonePort },
+      networkIdentity: {
+        packageName: env.AGENTCALL_PHONE_PACKAGE_NAME ?? 'com.callagent.gateway.cli',
+        versionCode: Number(env.AGENTCALL_PHONE_VERSION_CODE ?? 333),
+        systemFingerprint: env.AGENTCALL_PHONE_SYSTEM_FINGERPRINT
+          ?? 'POCO/gram_in/gram:12/RKQ1.211019.001/V14.0.5.0.SJPINXM:user/release-keys',
+        vendorFingerprint: env.AGENTCALL_PHONE_VENDOR_FINGERPRINT
+          ?? 'POCO/gram_in/gram:12/RKQ1.211019.001/V14.0.5.0.SJPINXM:user/release-keys',
+      },
     };
   }
 
