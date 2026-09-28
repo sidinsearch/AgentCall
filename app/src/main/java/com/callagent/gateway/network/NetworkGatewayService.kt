@@ -18,6 +18,7 @@ import android.os.Looper
 import android.os.PowerManager
 import android.os.Process
 import android.util.Log
+import androidx.annotation.RequiresApi
 import com.callagent.gateway.DeviceSelector
 import com.callagent.gateway.FileApprovedDeviceEvidenceProvider
 import com.callagent.gateway.ApprovedDeviceEvidenceProvider
@@ -140,13 +141,14 @@ class NetworkGatewayService : Service() {
     private fun configuredDesktopHost(): String? = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
         .getString(KEY_DESKTOP_HOST, null)?.trim()?.takeIf { it.isNotEmpty() }
 
+    @RequiresApi(33)
     private fun startOutboundBootstrap(enrollmentStore: ControllerEnrollmentStore, host: String) {
         val expectedGeneration = lifecycleGeneration.get()
         val port = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
             .getInt(KEY_DESKTOP_PORT, NetworkGatewayServer.BIND_PORT + 1)
         GatewayStateStore.update(this, GatewayUiEvent.WaitingForPairing)
         notifyStatus("Connecting to AgentCall server")
-        executor.execute {
+        phoneDataExecutor.execute {
             try {
                 val secret = NetworkBootstrapClient(this).pair(host, port)
                 try {

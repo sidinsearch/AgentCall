@@ -2,7 +2,9 @@ package com.callagent.gateway.network
 
 import android.content.Context
 import android.os.Build
+import androidx.annotation.RequiresApi
 import com.callagent.gateway.BuildConfig
+import com.callagent.gateway.usb.ControllerBootstrapCrypto
 import com.callagent.gateway.usb.ControllerBootstrapProtocol
 import java.io.DataInputStream
 import java.io.DataOutputStream
@@ -15,6 +17,7 @@ import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.SecretKeySpec
 
 /** Outbound first-time pairing client for the CLI server. */
+@RequiresApi(33)
 class NetworkBootstrapClient(private val context: Context) {
     fun pair(host: String, port: Int): ByteArray {
         require(host.isNotBlank() && port in 1..65535)
