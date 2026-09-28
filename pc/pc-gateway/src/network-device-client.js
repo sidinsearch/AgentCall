@@ -78,6 +78,79 @@ export class NetworkDeviceClient extends EventEmitter {
   get state() { return this._state; }
   get metrics() { return { ...this._metrics }; }
 
+  async accept(socket) {
+    if (!socket || typeof socket.write !== 'function') throw new TypeError('socket is required');
+    if (this._state !== 'disconnected') {
+      socket.destroy();
+      throw new Error('network device client is already connected');
+    }
+    this._state = 'connecting';
+    this._metrics.connectionAttempts++;
+    this._socket = socket;
+    try {
+      await this._authenticateAsServer(socket);
+      this._state = 'connected';
+      this._startReadLoop();
+      if (this._authRemainder?.length) {
+        const remainder = this._authRemainder;
+        this._authRemainder = null;
+        for (const frame of this._acc.push(remainder)) this._onFrame(frame);
+      }
+    } catch (error) {
+      this._state = 'disconnected';
+      this._socket = null;
+      socket.destroy();
+      throw error;
+    }
+  }
+
+  async _authenticateAsServer(socket) {
+    if (!this._enrollmentSecret) return;
+    const serverNonce = randomBytes(AUTH_NONCE_BYTES);
+    const readExact = (bytes) => new Promise((resolve, reject) => {
+      let buffer = Buffer.alloc(0);
+      const timer = setTimeout(() => { cleanup(); reject(new Error('controller authentication timed out')); }, this.authTimeoutMs);
+      const cleanup = () => {
+        clearTimeout(timer);
+        socket.removeListener('data', onData);
+        socket.removeListener('error', onError);
+        socket.removeListener('close', onClose);
+      };
+      const onError = (error) => { cleanup(); reject(error); };
+      const onClose = () => { cleanup(); reject(new Error('controller authentication socket closed')); };
+      const onData = (chunk) => {
+        buffer = Buffer.concat([buffer, chunk]);
+        if (buffer.length < bytes) return;
+        const value = Buffer.from(buffer.subarray(0, bytes));
+        buffer = Buffer.from(buffer.subarray(bytes));
+        this._authRemainder = buffer;
+        cleanup();
+        resolve(value);
+      };
+      socket.on('data', onData);
+      socket.once('error', onError);
+      socket.once('close', onClose);
+    });
+    try {
+      socket.write(Buffer.concat([AUTH_MAGIC_SERVER_HELLO, serverNonce]));
+      const record = await readExact(AUTH_CLIENT_RECORD_BYTES);
+      if (!record.subarray(0, 4).equals(AUTH_MAGIC_CLIENT_PROOF)) throw new Error('invalid controller client proof');
+      const clientNonce = record.subarray(4, 4 + AUTH_NONCE_BYTES);
+      const supplied = record.subarray(4 + AUTH_NONCE_BYTES);
+      const expected = authProof(this._enrollmentSecret, AUTH_CLIENT_DOMAIN, serverNonce, clientNonce);
+      if (!timingSafeEqual(expected, supplied)) throw new Error('controller client proof mismatch');
+      const proof = authProof(this._enrollmentSecret, AUTH_SERVER_DOMAIN, serverNonce, clientNonce);
+      socket.write(Buffer.concat([AUTH_MAGIC_SERVER_PROOF, proof]));
+      const sessionDigest = authProof(this._enrollmentSecret, AUTH_SESSION_DOMAIN, serverNonce, clientNonce);
+      const admitted = await readExact(AUTH_PROOF_BYTES);
+      if (!timingSafeEqual(sessionDigest, admitted)) throw new Error('controller session proof mismatch');
+      this.sessionId = sessionDigest.readUInt32BE(0);
+      expected.fill(0); proof.fill(0); sessionDigest.fill(0);
+    } finally {
+      serverNonce.fill(0);
+    }
+  }
+
   async connect() {
     if (this._state !== 'disconnected') return;
     this._state = 'connecting';
