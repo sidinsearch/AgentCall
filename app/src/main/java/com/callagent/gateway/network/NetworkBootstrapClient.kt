@@ -40,10 +40,10 @@ class NetworkBootstrapClient(private val context: Context) {
                 desktopBootstrapVersion = "1",
             )
             val hello = ControllerBootstrapProtocol.ClientHello(clientNonce, publicBytes, identity)
-            val serverBody = try {
+            val serverBody = run {
                 writeFrame(output, ControllerBootstrapProtocol.encodeClientHello(hello))
                 readFrame(input)
-            } finally { hello.nonce.fill(0); hello.publicKey.fill(0) }
+            }
             try {
                 require(serverBody.size == 5 + 32 + 32 + 32 + 16)
                 require(serverBody.copyOfRange(0, 5).contentEquals(byteArrayOf('G'.code.toByte(), '2'.code.toByte(), 'B'.code.toByte(), 'S'.code.toByte(), 1)))
