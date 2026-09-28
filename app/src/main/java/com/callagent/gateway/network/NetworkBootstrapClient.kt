@@ -50,7 +50,7 @@ class NetworkBootstrapClient(private val context: Context) {
                 val serverNonce = serverBody.copyOfRange(5, 37)
                 val serverPublic = serverBody.copyOfRange(37, 69)
                 val transcript = ControllerBootstrapProtocol.canonicalTranscript(hello, serverNonce, serverPublic)
-                val key = ControllerBootstrapProtocol.deriveControllerKey(ControllerBootstrapProtocol.x25519(privateBytes, serverPublic), clientNonce, serverNonce, transcript)
+                val key = ControllerBootstrapCrypto.deriveControllerKey(ControllerBootstrapCrypto.x25519(privateBytes, serverPublic), clientNonce, serverNonce, transcript)
                 openProof(key, transcript, serverBody.copyOfRange(69, 101), serverBody.copyOfRange(101, 117))
                 val confirm = sealProof(key, transcript)
                 writeFrame(output, byteArrayOf('G'.code.toByte(), '2'.code.toByte(), 'B'.code.toByte(), 'C'.code.toByte(), 1) + confirm)
