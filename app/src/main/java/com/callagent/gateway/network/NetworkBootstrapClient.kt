@@ -45,13 +45,13 @@ class NetworkBootstrapClient(private val context: Context) {
                 readFrame(input)
             }
             try {
-                require(serverBody.size == 5 + 32 + 32 + 32 + 16)
+                require(serverBody.size == 5 + 32 + 32 + 28 + 16)
                 require(serverBody.copyOfRange(0, 5).contentEquals(byteArrayOf('G'.code.toByte(), '2'.code.toByte(), 'B'.code.toByte(), 'S'.code.toByte(), 1)))
                 val serverNonce = serverBody.copyOfRange(5, 37)
                 val serverPublic = serverBody.copyOfRange(37, 69)
                 val transcript = ControllerBootstrapProtocol.canonicalTranscript(hello, serverNonce, serverPublic)
                 val key = ControllerBootstrapCrypto.deriveControllerKey(ControllerBootstrapCrypto.x25519(privateBytes, serverPublic), clientNonce, serverNonce, transcript)
-                openProof(key, transcript, serverBody.copyOfRange(69, 101), serverBody.copyOfRange(101, 117))
+                openProof(key, transcript, serverBody.copyOfRange(69, 97), serverBody.copyOfRange(97, 113))
                 val confirm = sealProof(key, transcript)
                 writeFrame(output, byteArrayOf('G'.code.toByte(), '2'.code.toByte(), 'B'.code.toByte(), 'C'.code.toByte(), 1) + confirm)
                 confirm.fill(0); transcript.fill(0); serverNonce.fill(0); serverPublic.fill(0)
