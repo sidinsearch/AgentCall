@@ -61,8 +61,7 @@ class NetworkGatewayServer(
         val payload: ByteArray = payload.copyOf()
     }
 
-    @Volatile private var server: ServerSocket? =
-        serverSocketFactory.create(BIND_ADDRESS, BIND_PORT)
+    @Volatile private var server: ServerSocket? = null
     private val running = AtomicBoolean(false)
 
     private val connectionLock = Any()
@@ -91,6 +90,12 @@ class NetworkGatewayServer(
 
     fun start() {
         if (!running.compareAndSet(false, true)) return
+        server = try {
+            serverSocketFactory.create(BIND_ADDRESS, BIND_PORT)
+        } catch (error: Throwable) {
+            running.set(false)
+            throw error
+        }
         listener.onListenerStarted(server?.localPort ?: BIND_PORT)
         Thread({
             while (running.get()) {
@@ -102,6 +107,23 @@ class NetworkGatewayServer(
                 admitClient(accepted)
             }
         }, "network-gateway-accept").apply { isDaemon = true; start() }
+    }
+
+    /** Connect to an AgentCall desktop/CLI listener as an outbound phone client. */
+    fun startOutbound(host: String, port: Int) {
+        require(host.isNotBlank()) { "host must not be blank" }
+        require(port in 1..65535) { "port must be 1..65535" }
+        if (!running.compareAndSet(false, true)) return
+        try {
+            val socket = Socket(host, port)
+            listener.onListenerStarted(port)
+            admitClient(socket, clientMode = true)
+        } catch (error: Throwable) {
+            running.set(false)
+            try { server?.close() } catch (_: IOException) {}
+            server = null
+            throw error
+        }
     }
 
     fun stop() {
@@ -203,7 +225,7 @@ class NetworkGatewayServer(
         if (message.kind == FrameKind.PCM) Arrays.fill(message.payload, 0)
     }
 
-    private fun admitClient(socket: Socket) {
+    private fun admitClient(socket: Socket, clientMode: Boolean = false) {
         val cleanupGuard = AtomicBoolean(false)
         val generation: Long
         synchronized(connectionLock) {
@@ -227,7 +249,7 @@ class NetworkGatewayServer(
                 val input: InputStream = socket.getInputStream()
                 val secret = enrollmentSecret
                 val authenticatedSessionId = if (secret != null) {
-                    authenticate(socket, input, secret) ?: run {
+                    (if (clientMode) authenticateAsClient(socket, input, secret) else authenticate(socket, input, secret)) ?: run {
                         listener.onAuthenticationFailed("Controller authentication failed")
                         return@Thread
                     }
@@ -269,6 +291,54 @@ class NetworkGatewayServer(
                 }
             }
         }, "network-gateway-read").apply { isDaemon = true; start() }
+    }
+
+    private fun authenticateAsClient(socket: Socket, input: InputStream, secret: ByteArray): Long? {
+        val originalTimeout = socket.soTimeout
+        val serverHello = ByteArray(AUTH_MAGIC_BYTES + AUTH_NONCE_BYTES)
+        val serverProof = ByteArray(AUTH_MAGIC_BYTES + AUTH_PROOF_BYTES)
+        val clientNonce = ByteArray(AUTH_NONCE_BYTES)
+        var clientProof: ByteArray? = null
+        var sessionDigest: ByteArray? = null
+        return try {
+            socket.soTimeout = authenticationTimeoutMillis
+            readFully(input, serverHello)
+            if (!serverHello.copyOfRange(0, AUTH_MAGIC_BYTES).contentEquals(AUTH_MAGIC_SERVER_HELLO)) return null
+            val serverNonce = serverHello.copyOfRange(AUTH_MAGIC_BYTES, serverHello.size)
+            SecureRandom().nextBytes(clientNonce)
+            clientProof = authProof(secret, AUTH_CLIENT_DOMAIN, serverNonce, clientNonce)
+            socket.getOutputStream().apply {
+                write(AUTH_MAGIC_CLIENT_PROOF)
+                write(clientNonce)
+                write(clientProof)
+                flush()
+            }
+            readFully(input, serverProof)
+            if (!serverProof.copyOfRange(0, AUTH_MAGIC_BYTES).contentEquals(AUTH_MAGIC_SERVER_PROOF)) return null
+            val expected = authProof(secret, AUTH_SERVER_DOMAIN, serverNonce, clientNonce)
+            val supplied = serverProof.copyOfRange(AUTH_MAGIC_BYTES, serverProof.size)
+            if (!MessageDigest.isEqual(expected, supplied)) return null
+            expected.fill(0)
+            sessionDigest = authProof(secret, AUTH_SESSION_DOMAIN, serverNonce, clientNonce)
+            socket.getOutputStream().apply {
+                write(sessionDigest!!.copyOfRange(0, 4))
+                flush()
+            }
+            sessionDigest!!.copyOfRange(0, 4).fold(0L) { value, byte ->
+                (value shl 8) or (byte.toLong() and 0xFF)
+            }
+        } catch (_: SocketTimeoutException) {
+            null
+        } catch (_: IOException) {
+            null
+        } finally {
+            try { socket.soTimeout = originalTimeout } catch (_: IOException) {}
+            Arrays.fill(serverHello, 0)
+            Arrays.fill(serverProof, 0)
+            Arrays.fill(clientNonce, 0)
+            clientProof?.let { Arrays.fill(it, 0) }
+            sessionDigest?.let { Arrays.fill(it, 0) }
+        }
     }
 
     private fun authenticate(socket: Socket, input: InputStream, secret: ByteArray): Long? {
