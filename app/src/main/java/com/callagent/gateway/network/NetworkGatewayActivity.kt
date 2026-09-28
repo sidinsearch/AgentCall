@@ -187,6 +187,7 @@ class NetworkGatewayActivity : AppCompatActivity() {
       requestGatewayPermissions(REQUIRED_PERMISSIONS.toTypedArray(), 27183)
       return
     }
+    val host = hostInput.text.toString().trim()
     val port = readPortPreference(27183) ?: 27183
     if (port != NetworkGatewayServer.BIND_PORT) {
       Toast.makeText(this, "Network gateway currently supports port 27183", Toast.LENGTH_LONG).show()
