@@ -40,14 +40,15 @@ export class NetworkDeviceListener {
       socket.destroy();
       return;
     }
-    const device = this.createDevice();
+    let device;
     try {
+      device = this.createDevice();
       await device.accept(socket);
       this.device = device;
       await this.onDevice(device);
     } catch (error) {
       this.onError(error);
-      try { await device.disconnect(); } catch {}
+      try { await device?.disconnect(); } catch {}
       socket.destroy();
     }
   }

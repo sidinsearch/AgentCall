@@ -145,7 +145,7 @@ class NetworkGatewayService : Service() {
     private fun startOutboundBootstrap(enrollmentStore: ControllerEnrollmentStore, host: String) {
         val expectedGeneration = lifecycleGeneration.get()
         val port = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
-            .getInt(KEY_DESKTOP_PORT, NetworkGatewayServer.BIND_PORT + 1)
+            .getInt(KEY_DESKTOP_PORT, NetworkGatewayServer.BIND_PORT) + 1
         GatewayStateStore.update(this, GatewayUiEvent.WaitingForPairing)
         notifyStatus("Connecting to AgentCall server")
         phoneDataExecutor.execute {
