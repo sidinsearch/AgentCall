@@ -16,25 +16,25 @@ import com.callagent.gateway.usb.UsbGatewayActivity
 
 /** Branded gateway entry screen with the same card and colour language as the dialer. */
 class GatewayActivity : Activity() {
-    private val background = Color.rgb(249, 250, 251)
-    private val surface = Color.WHITE
+    private val pageBackground = Color.rgb(249, 250, 251)
+    private val surfaceColor = Color.WHITE
     private val primary = Color.rgb(15, 118, 110)
     private val primaryDark = Color.rgb(19, 78, 74)
     private val primarySoft = Color.rgb(227, 245, 242)
-    private val text = Color.rgb(17, 24, 39)
+    private val textPrimary = Color.rgb(17, 24, 39)
     private val label = Color.rgb(55, 65, 81)
     private val muted = Color.rgb(107, 114, 128)
     private val border = Color.rgb(229, 231, 235)
 
     override fun onCreate(state: Bundle?) {
         super.onCreate(state)
-        window.statusBarColor = surface
+        window.statusBarColor = surfaceColor
         setContentView(buildContent())
     }
 
     private fun buildContent(): View = LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL
-        setBackgroundColor(background)
+        setBackgroundColor(pageBackground)
         setPadding(dp(20), dp(16), dp(20), dp(24))
 
         addView(LinearLayout(this@GatewayActivity).apply {
@@ -51,7 +51,7 @@ class GatewayActivity : Activity() {
                 text = "Gateway"
                 textSize = 22f
                 setTypeface(typeface, Typeface.BOLD)
-                setTextColor(text)
+                setTextColor(textPrimary)
                 layoutParams = LinearLayout.LayoutParams(0, dp(50), 1f)
             })
             addView(TextView(this@GatewayActivity).apply {
@@ -115,7 +115,7 @@ class GatewayActivity : Activity() {
         val card = LinearLayout(this@GatewayActivity).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(18), dp(16), dp(18), dp(16))
-            background = rounded(surface, dp(14), border)
+            background = rounded(surfaceColor, dp(14), border)
             isClickable = true
             setOnClickListener { onClick() }
             layoutParams = LinearLayout.LayoutParams(
@@ -148,7 +148,7 @@ class GatewayActivity : Activity() {
                     text = title
                     textSize = 19f
                     setTypeface(typeface, Typeface.BOLD)
-                    setTextColor(text)
+                    setTextColor(textPrimary)
                     setPadding(0, dp(2), 0, 0)
                 })
                 layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
