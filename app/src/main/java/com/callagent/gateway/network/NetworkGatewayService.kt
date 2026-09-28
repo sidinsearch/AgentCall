@@ -116,7 +116,11 @@ class NetworkGatewayService : Service() {
         val enrollmentStore = ControllerEnrollmentStore(AndroidControllerSecretStorage(this))
         this.enrollmentStore = enrollmentStore
         when (enrollmentStore.state()) {
-            ControllerEnrollmentState.EMPTY -> startBootstrapGateway(enrollmentStore)
+            ControllerEnrollmentState.EMPTY -> {
+                val desktopHost = configuredDesktopHost()
+                if (desktopHost != null) startOutboundBootstrap(enrollmentStore, desktopHost)
+                else startBootstrapGateway(enrollmentStore)
+            }
             ControllerEnrollmentState.STAGED -> startStagedRecovery(enrollmentStore)
             ControllerEnrollmentState.COMMITTED -> {
                 val controllerSecret = enrollmentStore.load() ?: run { stopGateway(); return }
@@ -129,6 +133,38 @@ class NetworkGatewayService : Service() {
             ControllerEnrollmentState.ASYMMETRIC_RESET_REQUIRED -> {
                 notifyStatus("Controller enrollment reset required")
                 stopGateway(GatewayUiEvent.Error("Controller enrollment reset required. Forget the paired desktop and try again."))
+            }
+        }
+    }
+
+    private fun configuredDesktopHost(): String? = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+        .getString(KEY_DESKTOP_HOST, null)?.trim()?.takeIf { it.isNotEmpty() }
+
+    private fun startOutboundBootstrap(enrollmentStore: ControllerEnrollmentStore, host: String) {
+        val expectedGeneration = lifecycleGeneration.get()
+        val port = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+            .getInt(KEY_DESKTOP_PORT, NetworkGatewayServer.BIND_PORT + 1)
+        GatewayStateStore.update(this, GatewayUiEvent.WaitingForPairing)
+        notifyStatus("Connecting to AgentCall server")
+        executor.execute {
+            try {
+                val secret = NetworkBootstrapClient(this).pair(host, port)
+                try {
+                    enrollmentStore.stage(secret)
+                    enrollmentStore.commitStagedAfterG2(secret)
+                    qualificationHandler.post {
+                        if (started.get() && lifecycleGeneration.get() == expectedGeneration) {
+                            startEnrolledGateway(secret)
+                        }
+                    }
+                } finally { secret.fill(0) }
+            } catch (error: Exception) {
+                Log.e(TAG, "Outbound desktop pairing failed", error)
+                qualificationHandler.post {
+                    if (started.get() && lifecycleGeneration.get() == expectedGeneration) {
+                        stopGateway(GatewayUiEvent.Error("Desktop pairing failed. Check the server address and retry."))
+                    }
+                }
             }
         }
     }
