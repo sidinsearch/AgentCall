@@ -16,19 +16,20 @@ import com.callagent.gateway.usb.UsbGatewayActivity
 
 /** Branded gateway entry screen with the same card and colour language as the dialer. */
 class GatewayActivity : Activity() {
-    private val pageBackground = Color.rgb(249, 250, 251)
-    private val surfaceColor = Color.WHITE
-    private val primary = Color.rgb(15, 118, 110)
-    private val primaryDark = Color.rgb(19, 78, 74)
-    private val primarySoft = Color.rgb(227, 245, 242)
-    private val textPrimary = Color.rgb(17, 24, 39)
-    private val label = Color.rgb(55, 65, 81)
-    private val muted = Color.rgb(107, 114, 128)
-    private val border = Color.rgb(229, 231, 235)
+    private val pageBackground = Color.rgb(10, 18, 32)
+    private val surfaceColor = Color.rgb(17, 28, 48)
+    private val primary = Color.rgb(45, 212, 191)
+    private val primaryDark = Color.rgb(153, 246, 228)
+    private val primarySoft = Color.rgb(18, 59, 66)
+    private val textPrimary = Color.rgb(248, 250, 252)
+    private val label = Color.rgb(203, 213, 225)
+    private val muted = Color.rgb(148, 163, 184)
+    private val border = Color.rgb(38, 54, 80)
 
     override fun onCreate(state: Bundle?) {
         super.onCreate(state)
-        window.statusBarColor = surfaceColor
+        window.statusBarColor = pageBackground
+        window.navigationBarColor = pageBackground
         setContentView(buildContent())
     }
 
@@ -40,10 +41,12 @@ class GatewayActivity : Activity() {
         addView(LinearLayout(this@GatewayActivity).apply {
             gravity = Gravity.CENTER_VERTICAL
             addView(TextView(this@GatewayActivity).apply {
-                text = "‹"
-                textSize = 34f
+                text = "←"
+                textSize = 24f
+                setTypeface(typeface, Typeface.BOLD)
                 setTextColor(primaryDark)
                 gravity = Gravity.CENTER
+                includeFontPadding = false
                 setOnClickListener { finish() }
                 layoutParams = LinearLayout.LayoutParams(dp(42), dp(50))
             })
@@ -52,6 +55,8 @@ class GatewayActivity : Activity() {
                 textSize = 22f
                 setTypeface(typeface, Typeface.BOLD)
                 setTextColor(textPrimary)
+                gravity = Gravity.CENTER_VERTICAL
+                includeFontPadding = false
                 layoutParams = LinearLayout.LayoutParams(0, dp(50), 1f)
             })
             addView(TextView(this@GatewayActivity).apply {
@@ -61,6 +66,7 @@ class GatewayActivity : Activity() {
                 setTypeface(typeface, Typeface.BOLD)
                 setTextColor(primary)
                 gravity = Gravity.CENTER_VERTICAL
+                includeFontPadding = false
             })
         })
 
