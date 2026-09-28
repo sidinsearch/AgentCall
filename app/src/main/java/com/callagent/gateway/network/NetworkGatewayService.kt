@@ -154,10 +154,13 @@ class NetworkGatewayService : Service() {
                 try {
                     enrollmentStore.stage(secret)
                     enrollmentStore.commitStagedAfterG2(secret)
+                    val operationalSecret = secret.copyOf()
                     qualificationHandler.post {
-                        if (started.get() && lifecycleGeneration.get() == expectedGeneration) {
-                            startEnrolledGateway(secret)
-                        }
+                        try {
+                            if (started.get() && lifecycleGeneration.get() == expectedGeneration) {
+                                startEnrolledGateway(operationalSecret)
+                            }
+                        } finally { operationalSecret.fill(0) }
                     }
                 } finally { secret.fill(0) }
             } catch (error: Exception) {
