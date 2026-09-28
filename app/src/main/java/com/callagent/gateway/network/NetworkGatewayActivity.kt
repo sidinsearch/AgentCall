@@ -193,9 +193,11 @@ class NetworkGatewayActivity : AppCompatActivity() {
       portInput.setText(NetworkGatewayServer.BIND_PORT.toString())
       return
     }
-    // The service owns the real authenticated listener. Do not open a
-    // placeholder ServerSocket here: that would occupy 27183 and make the
-    // service fail with EADDRINUSE while the UI falsely reports success.
+    getSharedPreferences(NetworkGatewayService.PREFS_NAME, MODE_PRIVATE)
+      .edit()
+      .putString(NetworkGatewayService.KEY_DESKTOP_HOST, host)
+      .putInt(NetworkGatewayService.KEY_DESKTOP_PORT, port)
+      .apply()
     listening.set(true)
     render(GatewayStateStore.snapshot())
     startForegroundServiceIfNecessary()

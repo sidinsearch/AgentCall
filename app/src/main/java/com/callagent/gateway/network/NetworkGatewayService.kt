@@ -454,7 +454,17 @@ class NetworkGatewayService : Service() {
                 enrollmentSecret = controllerSecret.copyOf(),
             )
             server = newServer
-            newServer.start()
+            val desktopHost = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+                .getString(KEY_DESKTOP_HOST, null)
+                ?.trim()
+                ?.takeIf { !it.isNullOrEmpty() }
+            if (desktopHost != null) {
+                val desktopPort = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+                    .getInt(KEY_DESKTOP_PORT, NetworkGatewayServer.BIND_PORT)
+                newServer.startOutbound(desktopHost, desktopPort)
+            } else {
+                newServer.start()
+            }
             installCallListener()
             acquireWakeLock()
         } catch (error: Exception) {
@@ -656,6 +666,9 @@ class NetworkGatewayService : Service() {
         const val ACTION_STOP = "com.callagent.gateway.NETWORK_STOP"
         private const val CHANNEL_ID = "agentcall_network_gateway"
         private const val NOTIFICATION_ID = 27184
+        const val PREFS_NAME = "agentcall_network_connection"
+        const val KEY_DESKTOP_HOST = "desktop_host"
+        const val KEY_DESKTOP_PORT = "desktop_port"
 
         fun start(context: Context) = context.startForegroundService(
             Intent(context, NetworkGatewayService::class.java).setAction(ACTION_START)
