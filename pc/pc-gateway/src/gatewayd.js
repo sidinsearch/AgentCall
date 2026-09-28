@@ -14,6 +14,7 @@ import { DeviceClient } from './device-client.js';
 import { NetworkAdbManager } from './network-adb-manager.js';
 import { NetworkBootstrapTransport } from './network-bootstrap-transport.js';
 import { NetworkDeviceClient } from './network-device-client.js';
+import { NetworkDeviceListener } from './network-device-listener.js';
 import { Gateway } from './gateway.js';
 import { CallerMemoryStore } from './caller-memory.js';
 import { loadControllerSecret as readControllerSecret } from './controller-secret.js';
@@ -540,6 +541,55 @@ export async function runGatewayd({
       rpc = createRpcServer(control, { socketPath: rpcSocketPath });
       await rpc.start();
 
+      const inboundNetworkRole = String(env.AGENTCALL_NETWORK_ROLE ?? '').toLowerCase() === 'server';
+      let networkListener = null;
+      if (inboundNetworkRole) {
+        const enrollmentSecret = await store.load();
+        if (!enrollmentSecret) {
+          control.setStage('WAITING_FOR_PHONE_START', 'phone_pairing_required');
+          throw new Error('network server mode requires a paired controller credential');
+        }
+        const listenHost = env.AGENTCALL_NETWORK_LISTEN_HOST || '0.0.0.0';
+        const listenPort = Number(env.AGENTCALL_NETWORK_LISTEN_PORT || config.phonePort || 27183);
+        networkListener = new NetworkDeviceListener({
+          host: listenHost,
+          port: listenPort,
+          createDevice: () => createNetworkDeviceClient({ enrollmentSecret: Buffer.from(enrollmentSecret) }),
+          onError: (error) => process.stderr.write(`network inbound connection failed: ${error?.stack || error}\\n`),
+          onDevice: async (acceptedDevice) => {
+            if (stopping || gateway) { await acceptedDevice.disconnect(); return; }
+            gateway = createGateway({
+              ...config.gateway,
+              mode: 'network',
+              device: acceptedDevice,
+              idempotencySalt: redactionSalt,
+              controllerSecret: Buffer.from(enrollmentSecret),
+              phoneHost: listenHost,
+              phonePort: listenPort,
+              recording,
+              phoneData,
+              providerSettings,
+              agentAnswering,
+              ...(callerMemory ? { callerMemory } : {}),
+              ...(createRealtimeSession ? { createRealtimeSession, checkProviderHealth, testProviders, prewarmSpeech } : {}),
+            });
+            await gateway.start({ phoneHost: listenHost, phonePort: listenPort });
+            control.attach(gateway);
+            control.setStage('AUTHENTICATED');
+            device = acceptedDevice;
+            acceptedDevice.on?.('state', (state) => {
+              if (state !== 'connected' && !stopping) {
+                control.detach();
+                control.setStage('WAITING_FOR_PHONE', 'phone_not_connected');
+                void cleanupNetwork().catch(() => {});
+              }
+            });
+          },
+        });
+        await networkListener.start();
+        control.setStage('WAITING_FOR_PHONE_START', 'waiting_for_phone_connection');
+      }
+
       const cleanupNetwork = async () => {
         const ownedGateway = gateway;
         const ownedDevice = device;
@@ -547,6 +597,7 @@ export async function runGatewayd({
         device = null;
         try { await ownedGateway?.stop(); } catch {}
         try { await ownedDevice?.disconnect(); } catch {}
+        try { await networkListener?.stop(); } catch {}
       };
       const scheduleRetry = () => {
         if (stopping || retryTimer) return;
@@ -658,7 +709,7 @@ export async function runGatewayd({
       };
       signals.once?.('SIGTERM', stop);
       signals.once?.('SIGINT', stop);
-      await connectNetworkPhone();
+      if (!inboundNetworkRole) await connectNetworkPhone();
       return { gateway: control, rpc, simulator: null, stop };
     }
 
