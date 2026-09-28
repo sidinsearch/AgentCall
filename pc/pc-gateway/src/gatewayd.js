@@ -13,6 +13,7 @@ import { ControllerCredentialStore } from './controller-credential-store.js';
 import { DeviceClient } from './device-client.js';
 import { NetworkAdbManager } from './network-adb-manager.js';
 import { NetworkBootstrapTransport } from './network-bootstrap-transport.js';
+import { NetworkBootstrapServer } from './network-bootstrap-server.js';
 import { NetworkDeviceClient } from './network-device-client.js';
 import { NetworkDeviceListener } from './network-device-listener.js';
 import { Gateway } from './gateway.js';
@@ -543,21 +544,38 @@ export async function runGatewayd({
 
       const inboundNetworkRole = String(env.AGENTCALL_NETWORK_ROLE ?? '').toLowerCase() === 'server';
       let networkListener = null;
+      let bootstrapListener = null;
       if (inboundNetworkRole) {
-        const enrollmentSecret = await store.load();
-        if (!enrollmentSecret) {
-          control.setStage('WAITING_FOR_PHONE_START', 'phone_pairing_required');
-          throw new Error('network server mode requires a paired controller credential');
-        }
+        let enrollmentSecret = await store.load();
         const listenHost = env.AGENTCALL_NETWORK_LISTEN_HOST || '0.0.0.0';
         const listenPort = Number(env.AGENTCALL_NETWORK_LISTEN_PORT || config.phonePort || 27183);
+        if (!enrollmentSecret) {
+          bootstrapListener = new NetworkBootstrapServer({
+            host: listenHost,
+            port: Number(env.AGENTCALL_NETWORK_BOOTSTRAP_PORT || 27184),
+            onError: (error) => process.stderr.write(`network bootstrap failed: ${error?.stack || error}\\n`),
+            onPaired: async ({ key, identity }) => {
+              try {
+                await store.stage(key, { serial: identity.serial });
+                enrollmentSecret = Buffer.from(key);
+                control.setStage('WAITING_FOR_PHONE_START', 'pairing_complete_waiting_for_g2');
+              } finally { key.fill(0); }
+            },
+          });
+          await bootstrapListener.start();
+          control.setStage('WAITING_FOR_PHONE_START', 'waiting_for_phone_pairing');
+        }
         networkListener = new NetworkDeviceListener({
           host: listenHost,
           port: listenPort,
-          createDevice: () => createNetworkDeviceClient({ enrollmentSecret: Buffer.from(enrollmentSecret) }),
+          createDevice: () => {
+            if (!enrollmentSecret) throw new Error('phone pairing has not completed');
+            return createNetworkDeviceClient({ enrollmentSecret: Buffer.from(enrollmentSecret) });
+          },
           onError: (error) => process.stderr.write(`network inbound connection failed: ${error?.stack || error}\\n`),
           onDevice: async (acceptedDevice) => {
             if (stopping || gateway) { await acceptedDevice.disconnect(); return; }
+            if (!enrollmentSecret) { await acceptedDevice.disconnect(); return; }
             gateway = createGateway({
               ...config.gateway,
               mode: 'network',
@@ -574,6 +592,10 @@ export async function runGatewayd({
               ...(createRealtimeSession ? { createRealtimeSession, checkProviderHealth, testProviders, prewarmSpeech } : {}),
             });
             await gateway.start({ phoneHost: listenHost, phonePort: listenPort });
+            const recovery = await store.recover();
+            if (recovery.state === 'staged') await store.commit(recovery.transaction);
+            await bootstrapListener?.stop();
+            bootstrapListener = null;
             control.attach(gateway);
             control.setStage('AUTHENTICATED');
             device = acceptedDevice;
@@ -587,7 +609,7 @@ export async function runGatewayd({
           },
         });
         await networkListener.start();
-        control.setStage('WAITING_FOR_PHONE_START', 'waiting_for_phone_connection');
+        if (enrollmentSecret) control.setStage('WAITING_FOR_PHONE_START', 'waiting_for_phone_connection');
       }
 
       const cleanupNetwork = async () => {
@@ -598,6 +620,7 @@ export async function runGatewayd({
         try { await ownedGateway?.stop(); } catch {}
         try { await ownedDevice?.disconnect(); } catch {}
         try { await networkListener?.stop(); } catch {}
+        try { await bootstrapListener?.stop(); } catch {}
       };
       const scheduleRetry = () => {
         if (stopping || retryTimer) return;
